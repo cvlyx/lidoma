@@ -2009,7 +2009,7 @@
                         student_class: studentClass,
                         term: term,
                         academic_year: academicYear,
-                        assign_positions: assignPositions && ['FORM 1', 'FORM 2'].includes(studentClass)
+                        assign_positions: Boolean(assignPositions && ['FORM 1', 'FORM 2'].includes(studentClass))
                     })
                 });
 
