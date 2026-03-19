@@ -1,0 +1,2143 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Exam Report Analyzer</title>
+    <!-- Note: cdn.tailwindcss.com is used for standalone local development convenience. 
+         For a formal production environment, Tailwind should be installed via PostCSS/CLI. -->
+    <script>
+        // Suppress Tailwind CDN production warning in console
+        (function() {
+            const originalWarn = console.warn;
+            console.warn = function(message) {
+                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return;
+                }
+                originalWarn.apply(console, arguments);
+            };
+        })();
+        window.tailwind = {
+            config: {
+                // Optional: add your tailwind config here
+            }
+        };
+    </script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .font-display {
+            font-family: 'Fraunces', serif;
+        }
+
+        .tab-active {
+            border-bottom: 3px solid;
+            font-weight: 600;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .bar-animate {
+            animation: growBar 0.6s ease forwards;
+            transform-origin: bottom;
+        }
+
+        @keyframes growBar {
+            from {
+                transform: scaleY(0);
+            }
+
+            to {
+                transform: scaleY(1);
+            }
+        }
+
+        .toast-slide {
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.5s forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            margin: 10mm auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+            body { 
+                background: white !important;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print { display: none !important; }
+            .a4-page {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                padding: 15mm;
+                box-shadow: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+            #tab-report { display: block !important; }
+            .h-full { height: auto !important; }
+        }
+    </style>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body class="h-full">
+    <div id="app" class="h-full w-full overflow-auto" style="background:#f0f2f8;"><!-- Toast Container -->
+        <div id="toast-container" class="fixed top-4 right-4 z-50"></div><!-- Header -->
+        <header id="app-header" class="w-full py-5 px-6"
+            style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);">
+            <div class="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-4">
+                    <div class="relative group">
+                        <img id="school-logo-main" src="image.png" alt="Logo" class="w-16 h-16 object-contain rounded-lg" onerror="this.src='https://via.placeholder.com/64?text=Logo'">
+                        <label for="logo-upload" class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-lg text-white text-[10px] font-bold">
+                            <i data-lucide="camera" class="w-4 h-4 mr-1"></i> Change
+                        </label>
+                        <input id="logo-upload" type="file" accept="image/*" class="hidden">
+                    </div>
+                    <div>
+                        <h1 id="school-name-display" class="font-display text-2xl font-bold" style="color:#f8fafc;">
+                            LIDOMA PRIVATE SECONDARY SCHOOL</h1>
+                        <p id="report-title-display" class="text-sm mt-1" style="color:#94a3b8;">Terminal Examination Report
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="PARENT_PORTAL.HTML" target="_blank" 
+                        class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                        style="background:rgba(255,255,255,0.1);color:#f8fafc;border:1px solid rgba(255,255,255,0.2);">
+                        <i data-lucide="external-link" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
+                    </a>
+                    <div class="flex items-center gap-2"><span id="year-badge"
+                            class="px-3 py-1 rounded-full text-xs font-semibold"
+                            style="background:#4f46e5;color:#f8fafc;">2024/2025</span>
+                    </div>
+                </div>
+            </div>
+        </header><!-- Tabs -->
+        <nav class="w-full px-6 no-print" style="background:#ffffff;border-bottom:1px solid #e2e8f0;" role="navigation"
+            aria-label="Main navigation">
+            <div class="max-w-6xl mx-auto flex gap-6">
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="students" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="users" style="width:15px;height:15px;"></i>
+                        Manage Students</span> </button>
+                <button class="tab-btn tab-active py-3 px-1 text-sm transition-colors" data-tab="entry"
+                    style="border-color:#4f46e5;color:#4f46e5;"> <span class="flex items-center gap-1.5"><i
+                           <i data-lucide="pencil" style="width:15px;height:15px;"></i> Enter Grades</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="report" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="file-text"
+                            style="width:15px;height:15px;"></i> View Report</span> </button> <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="analytics" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2"
+                            style="width:15px;height:15px;"></i> Analytics</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="settings" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="settings"
+                            style="width:15px;height:15px;"></i> Settings</span> </button>
+            </div>
+        </nav>
+
+        <!-- Tab: Students -->
+        <main id="tab-students" class="max-w-6xl mx-auto p-6 hidden fade-in">
+            <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <h2 class="font-display text-lg font-bold mb-4" style="color:#1e293b;">
+                    <span class="flex items-center gap-2"><i data-lucide="user-plus"
+                            style="width:20px;height:20px;color:#4f46e5;"></i> Register New Student</span>
+                </h2>
+                <form id="student-reg-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Student Name</label>
+                        <input id="reg-name" type="text" placeholder="John Doe"
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Class</label>
+                        <select id="reg-class" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" required>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Student ID</label>
+                        <div class="relative">
+                            <input id="reg-id" type="text" class="w-full rounded-lg pl-3 pr-10 py-2.5 text-sm font-mono"
+                                style="border:1px solid #cbd5e1;color:#1e293b;" readonly>
+                            <button id="btn-regen-reg-id" type="button"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+                                title="Generate New ID" style="color:#4f46e5;">
+                                <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit"
+                        class="rounded-lg px-5 py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                        style="background:#4f46e5;color:#f8fafc;">
+                        <i data-lucide="plus" style="width:16px;height:16px;"></i> Register Student
+                    </button>
+                </form>
+            </section>
+
+            <section class="rounded-xl overflow-hidden card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="px-6 py-4 flex flex-wrap items-center justify-between gap-4"
+                    style="border-bottom:1px solid #e2e8f0;">
+                    <h2 class="font-display text-lg font-bold" style="color:#1e293b;">
+                        <span class="flex items-center gap-2"><i data-lucide="users"
+                                style="width:20px;height:20px;color:#4f46e5;"></i> Registered Students</span>
+                    </h2>
+                    <div class="flex items-center gap-3">
+                        <select id="filter-reg-class"
+                            class="text-sm rounded-lg px-3 py-1.5 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="all">All Classes</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Student ID</th>
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Name</th>
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Class</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-mgmt-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="student-empty-state" class="text-center py-12 px-6 hidden">
+                    <i data-lucide="users" style="width:48px;height:48px;color:#cbd5e1;margin:0 auto;display:block;"></i>
+                    <p class="mt-3 text-sm" style="color:#94a3b8;">No students registered yet.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Tab: Entry -->
+        <main id="tab-entry" class="max-w-6xl mx-auto p-6 fade-in">
+            <!-- Student Info Form -->
+            <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;"
+                aria-label="Student Information">
+                <h2 class="font-display text-lg font-bold mb-4" style="color:#1e293b;"><span
+                        class="flex items-center gap-2"><i data-lucide="user"
+                            style="width:20px;height:20px;color:#4f46e5;"></i> Grade Entry Selection</span></h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Class</label>
+                        <select id="inp-class" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">Select Class First</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Student</label>
+                        <select id="inp-student-select" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" disabled>
+                            <option value="">Select a student...</option>
+                        </select>
+                    </div>
+                    <div><label for="inp-term" class="block text-xs font-semibold mb-1"
+                            style="color:#64748b;">Term</label> <select id="inp-term"
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option>First Term</option>
+                            <option>Second Term</option>
+                            <option>Third Term</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="inp-academic-year" class="block text-xs font-semibold mb-1" style="color:#64748b;">Academic Year</label>
+                        <input id="inp-academic-year" type="text" placeholder="e.g. 2025/2026" class="w-full rounded-lg px-3 py-2.5 text-sm" style="border:1px solid #cbd5e1;color:#1e293b;">
+                    </div>
+                </div>
+                <div id="selected-student-details" class="mt-4 p-3 rounded-lg hidden" style="background:#f8fafc; border: 1px dashed #cbd5e1;">
+                    <p class="text-xs text-slate-500">Currently entering grades for: <strong id="display-selected-name" class="text-indigo-600"></strong> | ID: <strong id="display-selected-id"></strong></p>
+                </div>
+            </section><!-- Add Subject Score -->
+            <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;"
+                aria-label="Add Subject Score">
+                <h2 class="font-display text-lg font-bold mb-4" style="color:#1e293b;"><span
+                        class="flex items-center gap-2"><i data-lucide="plus-circle"
+                            style="width:20px;height:20px;color:#4f46e5;"></i> Add Subject Score</span></h2>
+                <form id="score-form" class="flex flex-wrap items-end gap-4">
+                    <div class="flex-1 min-w-[180px] relative"><label for="inp-subject"
+                            class="block text-xs font-semibold mb-1" style="color:#64748b;">Subject</label> <input
+                            id="inp-subject" list="subject-list" type="text" placeholder="Search or select subject..."
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" autocomplete="off" required> <datalist
+                            id="subject-list">
+                            <option value="English">
+                            <option value="Mathematics">
+                            <option value="Biology">
+                            <option value="Chemistry">
+                            <option value="Physics">
+                            <option value="Agriculture">
+                            <option value="Computer Studies">
+                            <option value="Geography">
+                            <option value="History">
+                            <option value="Chichewa">
+                            <option value="Bible Knowledge">
+                            <option value="Social Studies">
+                            <option value="Life Skills">
+                        </datalist>
+                    </div>
+                    <div class="w-32"><label for="inp-score" class="block text-xs font-semibold mb-1"
+                            style="color:#64748b;">Score (0–100)</label> <input id="inp-score" type="number" min="0"
+                            max="100" placeholder="85" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" required>
+                    </div>
+                    <div class="flex-1 min-w-[180px]"><label for="inp-teacher-comment"
+                            class="block text-xs font-semibold mb-1" style="color:#64748b;">Teacher Comment</label>
+                        <input id="inp-teacher-comment" type="text" placeholder="e.g. Good effort"
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                    </div><button id="btn-add" type="submit"
+                        class="rounded-lg px-5 py-2.5 text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                        style="background:#4f46e5;color:#f8fafc;"> <i data-lucide="plus"
+                            style="width:16px;height:16px;"></i> Add Score </button>
+                </form>
+<!-- Grades Table -->
+            <section class="rounded-xl overflow-hidden card-hover" style="background:#ffffff;border:1px solid #e2e8f0;"
+                aria-label="Entered Grades">
+                <div class="px-6 py-4 flex flex-wrap items-center justify-between gap-4"
+                    style="border-bottom:1px solid #e2e8f0;">
+                    <h2 class="font-display text-lg font-bold" style="color:#1e293b;"><span
+                            class="flex items-center gap-2"><i data-lucide="list"
+                                style="width:20px;height:20px;color:#4f46e5;"></i> Entered Grades</span></h2>
+                    <div class="flex items-center gap-3 flex-wrap"><select id="filter-student"
+                            class="text-sm rounded-lg px-3 py-1.5 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            style="min-width:180px;">
+                            <option value="all">All Students</option>
+                        </select> <span id="entry-count" class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style="background:#e0e7ff;color:#4f46e5;">0 subjects</span> <button id="btn-clear-db"
+                            class="text-xs font-semibold px-2.5 py-1 rounded-full text-red-600 bg-red-50 hover:bg-red-100 transition-colors">Clear
+                            All</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Subject</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Score</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Grade</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Grade/Points</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Result</th>
+                                <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Teacher Comment
+                                </th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="grades-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="text-center py-12 px-6"><i data-lucide="inbox"
+                        style="width:48px;height:48px;color:#cbd5e1;margin:0 auto;display:block;"></i>
+                    <p class="mt-3 text-sm" style="color:#94a3b8;">No grades entered yet. Add a subject score above to
+                        get started.</p>
+                </div><!-- Summary Row -->
+                <div id="summary-row" class="hidden px-6 py-4 flex flex-wrap gap-6"
+                    style="background:#f8fafc;border-top:1px solid #e2e8f0;">
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Total Subjects:</span> <strong id="sum-total"
+                            class="text-sm" style="color:#1e293b;">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Average Score:</span> <strong id="sum-avg"
+                            class="text-sm" style="color:#1e293b;">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Highest:</span> <strong id="sum-high"
+                            class="text-sm" style="color:#1e293b;">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Lowest:</span> <strong id="sum-low" class="text-sm"
+                            style="color:#1e293b;">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Total Points:</span> <strong id="sum-pts"
+                            class="text-sm" style="color:#1e293b;">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">GPA:</span> <strong id="sum-gpa" class="text-sm"
+                            style="color:#4f46e5;">0.00</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs" style="color:#64748b;">Overall Result:</span> <strong id="sum-result"
+                            class="text-sm">—</strong>
+                    </div>
+                </div>
+            </section>
+        </main><!-- Tab: Report (Printable) -->
+        <div id="tab-report" class="max-w-4xl mx-auto p-6 hidden fade-in">
+            <div class="no-print mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider mb-2" style="color:#64748b;">Select Student to View Report</label>
+                    <select id="report-student-select" class="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-all focus:ring-2 focus:ring-indigo-500/20"
+                        style="border:1px solid #cbd5e1;color:#1e293b; background-color: #f8fafc;">
+                        <option value="">Select a student...</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <div class="relative" id="export-dropdown">
+                        <button id="btn-export-toggle"
+                            class="rounded-lg px-5 py-2.5 text-sm font-bold flex items-center gap-2 transition-all hover:bg-indigo-700 active:scale-95 shadow-lg"
+                            style="background:#4f46e5;color:#ffffff;">
+                            <i data-lucide="file-down" style="width:18px;height:18px;"></i>
+                            <span>Export Report</span>
+                            <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+                        </button>
+                        <div id="export-menu"
+                            class="hidden absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 z-[100] overflow-hidden border border-slate-100">
+                            <div class="p-2 space-y-1">
+                                <button id="export-pdf"
+                                    class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg flex items-center gap-3 transition-colors">
+                                    <i data-lucide="file-text" class="text-red-500" style="width:18px;height:18px;"></i>
+                                    <span>Save as PDF (.pdf)</span>
+                                </button>
+                                <button id="export-word"
+                                    class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors">
+                                    <i data-lucide="file-type-2" class="text-blue-600" style="width:18px;height:18px;"></i>
+                                    <span>Save as Word (.doc)</span>
+                                </button>
+                                <button id="export-image"
+                                    class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg flex items-center gap-3 transition-colors">
+                                    <i data-lucide="image" class="text-emerald-500" style="width:18px;height:18px;"></i>
+                                    <span>Save as Image (.png)</span>
+                                </button>
+                                <div class="h-px bg-slate-100 my-1"></div>
+                                <button id="export-csv"
+                                    class="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 rounded-lg flex items-center gap-3 transition-colors">
+                                    <i data-lucide="table" class="text-amber-600" style="width:18px;height:18px;"></i>
+                                    <span>Export Data (.csv)</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-print"
+                        class="rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+                        <i data-lucide="printer" style="width:16px;height:16px;"></i>
+                        <span>Print</span>
+                    </button>
+                </div>
+            </div>
+            <div id="print-report" class="a4-page">
+                <div id="report-content">
+                    <p class="text-center text-sm py-20" style="color:#94a3b8;">Select a student above to view their A4 report.</p>
+                </div>
+            </div>
+        </div><!-- Tab: Analytics -->
+        <div id="tab-analytics" class="max-w-6xl mx-auto p-6 hidden fade-in">
+            <div id="analytics-content-alt">
+                <p class="text-center text-sm py-12" style="color:#94a3b8;">Enter grades to see analytics.</p>
+            </div>
+        </div>
+
+        <!-- Tab: Settings -->
+        <main id="tab-settings" class="max-w-3xl mx-auto p-6 hidden fade-in">
+            <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <h2 class="font-display text-lg font-bold mb-6" style="color:#1e293b;">
+                    <span class="flex items-center gap-2"><i data-lucide="settings"
+                            style="width:20px;height:20px;color:#4f46e5;"></i> System Settings</span>
+                </h2>
+                
+                <div class="space-y-6">
+                    <!-- School Logo Section -->
+                    <div class="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                        <h3 class="text-sm font-bold mb-3 flex items-center gap-2">
+                            <i data-lucide="image" class="w-4 h-4 text-indigo-600"></i> School Logo Setup
+                        </h3>
+                        <div class="flex items-start gap-4">
+                            <div class="relative group">
+                                <img id="settings-logo-preview" src="image.png" class="w-24 h-24 object-contain rounded-lg border-2 border-white shadow-sm bg-white" onerror="this.src='https://via.placeholder.com/96?text=Logo'">
+                                <label for="settings-logo-upload" class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-lg text-white text-[10px] font-bold">
+                                    Update
+                                </label>
+                                <input id="settings-logo-upload" type="file" accept="image/*" class="hidden">
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-xs text-slate-600 leading-relaxed mb-2">
+                                    <strong>Important:</strong> When running locally (file:// protocol), browser security prevents automatic image loading for PDF generation. 
+                                </p>
+                                <p class="text-[11px] text-indigo-600 font-medium">
+                                    <i data-lucide="info" class="w-3 h-3 inline mr-1"></i> Please upload your school logo here manually to enable high-quality PDF/Image exports.
+                                </p>
+                                <button onclick="document.getElementById('settings-logo-upload').click()" class="mt-3 text-xs font-bold py-1.5 px-4 rounded bg-white border border-slate-300 hover:bg-slate-50 transition-colors">
+                                    Select Image
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- School Info Section -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold mb-1" style="color:#64748b;">School Name</label>
+                            <input id="set-school-name" type="text" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                                style="border:1px solid #cbd5e1;color:#1e293b;">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Academic Year</label>
+                            <input id="set-academic-year" type="text" placeholder="e.g. 2024/2025"
+                                class="w-full rounded-lg px-3 py-2.5 text-sm"
+                                style="border:1px solid #cbd5e1;color:#1e293b;">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100">
+                        <button id="btn-save-settings" class="rounded-lg px-6 py-2.5 text-sm font-bold transition-all hover:opacity-90 active:scale-95"
+                            style="background:#4f46e5;color:#ffffff;">
+                            Save Settings
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Delete Confirmation Overlay -->
+        <!-- Auth Overlay -->
+        <div id="auth-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center no-print"
+            style="background:rgba(15,23,42,0.75);">
+            <div class="rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+                style="background:#ffffff;border:1px solid #e2e8f0;">
+                <h3 class="font-display text-xl font-bold mb-1" style="color:#0f172a;">Teacher Login</h3>
+                <p class="text-xs mb-5" style="color:#64748b;">Sign in to sync with the school database.</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Username</label>
+                        <input id="auth-username" type="text" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#0f172a;" autocomplete="username">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Password</label>
+                        <input id="auth-password" type="password" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#0f172a;" autocomplete="current-password">
+                    </div>
+                    <button id="btn-auth-login"
+                        class="w-full rounded-lg px-5 py-2.5 text-sm font-bold transition-all hover:opacity-95 active:scale-95"
+                        style="background:#4f46e5;color:#ffffff;">
+                        Sign In
+                    </button>
+                    <p id="auth-error" class="text-xs hidden" style="color:#dc2626;"></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-overlay" class="fixed inset-0 z-40 hidden flex items-center justify-center"
+            style="background:rgba(0,0,0,0.4);">
+            <div class="rounded-xl p-6 max-w-sm w-full mx-4" style="background:#ffffff;">
+                <h3 class="font-display text-lg font-bold mb-2" style="color:#1e293b;">Delete Grade?</h3>
+                <p class="text-sm mb-5" style="color:#64748b;">This will permanently remove this subject grade from the
+                    report.</p>
+                <div class="flex gap-3 justify-end"><button id="btn-cancel-del"
+                        class="rounded-lg px-4 py-2 text-sm font-semibold"
+                        style="border:1px solid #e2e8f0;color:#64748b;">Cancel</button> <button id="btn-confirm-del"
+                        class="rounded-lg px-4 py-2 text-sm font-semibold"
+                        style="background:#ef4444;color:#ffffff;">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ========== GRADING LOGIC ==========
+        function calcGrade(score, studentClass) {
+            const isForm1Or2 = studentClass === 'FORM 1' || studentClass === 'FORM 2';
+            if (isForm1Or2) {
+                if (score >= 80) return { grade: 'A', points: 1, result: 'PASS' };
+                if (score >= 60) return { grade: 'B', points: 1, result: 'PASS' };
+                if (score >= 40) return { grade: 'C', points: 1, result: 'PASS' };
+                return { grade: 'F', points: 0, result: 'FAIL' };
+            } else {
+                if (score >= 90) return { grade: '1', points: 1, result: 'DIST' };
+                if (score >= 80) return { grade: '2', points: 2, result: 'DIST' };
+                if (score >= 70) return { grade: '3', points: 3, result: 'STRONG CREDIT' };
+                if (score >= 66) return { grade: '4', points: 4, result: 'CRED' };
+                if (score >= 60) return { grade: '5', points: 5, result: 'CRED' };
+                if (score >= 50) return { grade: '6', points: 6, result: 'CRED' };
+                if (score >= 46) return { grade: '7', points: 7, result: 'PASS' };
+                if (score >= 40) return { grade: '8', points: 8, result: 'PASS' };
+                return { grade: '9', points: 9, result: 'FAIL' };
+            }
+        }
+
+        function resultColor(result) {
+            const m = {
+                'DIST': '#059669',
+                'STRONG CREDIT': '#2563eb',
+                'CRED': '#4f46e5',
+                'PASS': '#d97706',
+                'FAIL': '#dc2626'
+            };
+            return m[result] || '#64748b';
+        }
+
+        function resultBg(result) {
+            const m = {
+                'DIST': '#ecfdf5',
+                'STRONG CREDIT': '#eff6ff',
+                'CRED': '#f5f3ff',
+                'PASS': '#fffbeb',
+                'FAIL': '#fef2f2'
+            };
+            return m[result] || '#f8fafc';
+        }
+
+        function overallResult(gpa) {
+            if (gpa >= 3.5) return 'First Class';
+            if (gpa >= 3.0) return 'Second Class Upper';
+            if (gpa >= 2.5) return 'Second Class Lower';
+            if (gpa >= 2.0) return 'Third Class';
+            if (gpa >= 1.0) return 'Pass';
+            return 'Fail';
+        }
+
+        // ========== STATE ==========
+        let allRecords = [];
+        let students = []; // Added for student management
+        let deleteTarget = null;
+        let deleteStudentTarget = null;
+        let isLoading = false;
+        let currentFilter = 'all';
+        let currentRegFilter = 'all';
+        let selectedStudentId = null;
+        let logoDataURL = 'image.png'; // Fallback
+        const STORAGE_KEY = 'lidoma_local_db';
+        const STUDENT_KEY = 'lidoma_students';
+        const SETTINGS_KEY = 'lidoma_settings';
+        const LOGO_KEY = 'lidoma_logo_base64';
+
+        // ========== BACKEND API / AUTH ==========
+        const API_BASE = 'http://127.0.0.1:8787';
+        const TOKEN_KEY = 'lidoma_jwt';
+
+        function getToken() {
+            return sessionStorage.getItem(TOKEN_KEY) || '';
+        }
+
+        function setToken(token) {
+            if (!token) sessionStorage.removeItem(TOKEN_KEY);
+            else sessionStorage.setItem(TOKEN_KEY, token);
+        }
+
+        async function apiRequest(path, { method = 'GET', headers = {}, body } = {}) {
+            const token = getToken();
+            const res = await fetch(API_BASE + path, {
+                method,
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...headers
+                },
+                body
+            });
+            if (res.status === 204) return null;
+            const contentType = res.headers.get('content-type') || '';
+            const data = contentType.includes('application/json') ? await res.json() : await res.text();
+            if (!res.ok) {
+                const detail = (data && typeof data === 'object' && data.detail) ? data.detail : (data || 'Request failed');
+                throw new Error(detail);
+            }
+            return data;
+        }
+
+        function showAuthOverlay() {
+            const overlay = document.getElementById('auth-overlay');
+            if (overlay) overlay.classList.remove('hidden');
+        }
+
+        function hideAuthOverlay() {
+            const overlay = document.getElementById('auth-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+
+        async function login(username, password) {
+            // OAuth2PasswordRequestForm expects x-www-form-urlencoded
+            const form = new URLSearchParams();
+            form.set('username', username);
+            form.set('password', password);
+            const data = await apiRequest('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: form.toString()
+            });
+            setToken(data.access_token);
+            hideAuthOverlay();
+            return true;
+        }
+
+        // Logo upload and management logic
+        async function setupLogoManager() {
+            const upload = document.getElementById('logo-upload');
+            const settingsUpload = document.getElementById('settings-logo-upload');
+            const mainLogo = document.getElementById('school-logo-main');
+            const settingsLogo = document.getElementById('settings-logo-preview');
+
+            // Load from backend (public) on start; fallback to localStorage for older offline data
+            try {
+                const logo = await apiRequest('/api/public/logo');
+                if (logo && logo.data_url) {
+                    logoDataURL = logo.data_url;
+                } else {
+                    const savedLogo = localStorage.getItem(LOGO_KEY);
+                    if (savedLogo) logoDataURL = savedLogo;
+                }
+            } catch (e) {
+                const savedLogo = localStorage.getItem(LOGO_KEY);
+                if (savedLogo) logoDataURL = savedLogo;
+            }
+
+            if (mainLogo) mainLogo.src = logoDataURL;
+            if (settingsLogo) settingsLogo.src = logoDataURL;
+
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const b64 = event.target.result;
+                    logoDataURL = b64;
+                    mainLogo.src = logoDataURL;
+                    if (settingsLogo) settingsLogo.src = logoDataURL;
+                    // Save to backend (admin). Keep localStorage as fallback cache.
+                    localStorage.setItem(LOGO_KEY, b64);
+                    apiRequest('/api/admin/logo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data_url: b64 })
+                    }).then(() => {
+                        showToast('School logo updated and saved.');
+                    }).catch(() => {
+                        showToast('Logo updated locally (admin permission needed to save to server).', 'warning');
+                    });
+                    // Refresh report if visible
+                    if (!document.getElementById('tab-report').classList.contains('hidden')) {
+                        buildReport();
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+
+            if (upload) upload.addEventListener('change', handleFileSelect);
+            if (settingsUpload) settingsUpload.addEventListener('change', handleFileSelect);
+        }
+
+        // Utility to convert image to base64 to avoid Tainted Canvas error
+        // Deprecated in favor of direct localStorage upload, but kept for initial image.png support
+        async function convertLogoToBase64() {
+            if (localStorage.getItem(LOGO_KEY)) {
+                logoDataURL = localStorage.getItem(LOGO_KEY);
+                return;
+            }
+
+            // Silent check for file:// protocol
+            if (window.location.protocol === 'file:') {
+                // If on file protocol, don't even try canvas conversion as it will surely fail and cause noise
+                // Just show a helpful toast once if no logo is set
+                if (!localStorage.getItem('logo_setup_notified')) {
+                    setTimeout(() => {
+                        showToast('Logo Setup Needed: Please upload your logo in Settings for better exports.', 'warning');
+                        localStorage.setItem('logo_setup_notified', 'true');
+                    }, 2000);
+                }
+                return;
+            }
+
+            try {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.src = 'image.png';
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject('Image load failed');
+                });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const dataURL = canvas.toDataURL('image/png');
+                logoDataURL = dataURL;
+                localStorage.setItem(LOGO_KEY, dataURL);
+                document.getElementById('school-logo-main').src = logoDataURL;
+            } catch (e) {
+                // Silently fail, manual upload is preferred anyway
+            }
+        }
+
+        // Settings Manager
+        async function initSettings() {
+            const schoolInput = document.getElementById('set-school-name');
+            const yearInput = document.getElementById('set-academic-year');
+            const saveBtn = document.getElementById('btn-save-settings');
+
+            // Load initial values
+            const settings = await SettingsDB.get();
+            const cfg = (window.elementSdk && window.elementSdk.config) ? window.elementSdk.config : defaultConfig;
+            
+            schoolInput.value = settings.school_name || cfg.school_name || defaultConfig.school_name;
+            yearInput.value = settings.academic_year || cfg.academic_year || defaultConfig.academic_year;
+
+            saveBtn.onclick = () => {
+                const newSettings = {
+                    school_name: schoolInput.value.trim(),
+                    academic_year: yearInput.value.trim()
+                };
+                SettingsDB.save(newSettings).catch((e) => {
+                    showToast(e.message || 'Failed to save settings', 'error');
+                });
+                
+                // Update UI immediately
+                document.getElementById('school-name-display').textContent = newSettings.school_name;
+                document.getElementById('year-badge').textContent = newSettings.academic_year;
+                
+                showToast('Settings saved successfully');
+            };
+        }
+
+        // ========== BACKEND DB ==========
+        const LocalDB = {
+            async getAll() {
+                const rows = await apiRequest('/api/records');
+                // Keep compatibility with existing UI code (expects __backendId)
+                return (rows || []).map(r => ({
+                    __backendId: r.id,
+                    student_id: r.student_id,
+                    student_name: r.student_name,
+                    student_class: r.student_class,
+                    term: r.term,
+                    academic_year: r.academic_year,
+                    subject: r.subject,
+                    score: r.score,
+                    teacher_comment: r.teacher_comment || ''
+                }));
+            },
+            async save(records) {
+                // Server is source of truth; just refresh UI.
+                allRecords = records;
+                updateStudentFilterOptions();
+                renderAll();
+                return { isOk: true };
+            },
+            async create(record) {
+                try {
+                    await apiRequest('/api/records', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            student_id: record.student_id,
+                            student_name: record.student_name,
+                            student_class: record.student_class,
+                            term: record.term,
+                            academic_year: record.academic_year,
+                            subject: record.subject,
+                            score: record.score,
+                            teacher_comment: record.teacher_comment || null
+                        })
+                    });
+                    const records = await this.getAll();
+                    return await this.save(records);
+                } catch (e) {
+                    console.error('Error creating in LocalDB:', e);
+                    return { isOk: false };
+                }
+            },
+            async delete(id) {
+                try {
+                    await apiRequest(`/api/records/${id}`, { method: 'DELETE' });
+                    const records = await this.getAll();
+                    return await this.save(records);
+                } catch (e) {
+                    console.error('Error deleting from LocalDB:', e);
+                    return { isOk: false };
+                }
+            },
+            async clearAll() {
+                try {
+                    await apiRequest('/api/records/clear', { method: 'DELETE' });
+                    allRecords = [];
+                    updateStudentFilterOptions();
+                    renderAll();
+                    return { isOk: true };
+                } catch (e) {
+                    console.error('Error clearing LocalDB:', e);
+                    return { isOk: false };
+                }
+            }
+        };
+
+        const StudentDB = {
+            async getAll() {
+                const rows = await apiRequest('/api/students');
+                return (rows || []).map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
+            },
+            async save(list) {
+                students = list;
+                renderStudents();
+                updateEntryStudentSelect();
+            },
+            async create(student) {
+                await apiRequest('/api/students', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: student.id, name: student.name, student_class: student.class })
+                });
+                const list = await this.getAll();
+                await this.save(list);
+                return { isOk: true };
+            },
+            async delete(id) {
+                await apiRequest(`/api/students/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                const list = await this.getAll();
+                await this.save(list);
+                return { isOk: true };
+            }
+        };
+
+        const SettingsDB = {
+            async get() {
+                try {
+                    const s = await apiRequest('/api/public/settings');
+                    return s || {};
+                } catch (e) {
+                    const data = localStorage.getItem(SETTINGS_KEY);
+                    return data ? JSON.parse(data) : {};
+                }
+            },
+            async save(settings) {
+                // Cache locally too (for offline display), but prefer backend
+                const current = await this.get();
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+                await apiRequest('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+            }
+        };
+
+        const defaultConfig = {
+            school_name: 'LIDOMA PRIVATE SECONDARY SCHOOL',
+            report_title: 'Terminal Examination Report',
+            academic_year: '2024/2025',
+            background_color: '#f0f2f8',
+            surface_color: '#ffffff',
+            text_color: '#1e293b',
+            primary_action_color: '#4f46e5',
+            secondary_action_color: '#64748b',
+            font_family: 'DM Sans',
+            font_size: 14
+        };
+
+        // ========== ELEMENT SDK ==========
+        if (window.elementSdk) {
+            window.elementSdk.init({
+                defaultConfig,
+                onConfigChange: async (config) => {
+                    const bg = config.background_color || defaultConfig.background_color;
+                    const surface = config.surface_color || defaultConfig.surface_color;
+                    const text = config.text_color || defaultConfig.text_color;
+                    const primary = config.primary_action_color || defaultConfig.primary_action_color;
+                    const secondary = config.secondary_action_color || defaultConfig.secondary_action_color;
+                    const font = config.font_family || defaultConfig.font_family;
+                    const fs = config.font_size || defaultConfig.font_size;
+
+                    document.getElementById('app').style.background = bg;
+                    document.querySelectorAll('section, .print-area, #tab-report > div:last-child').forEach(el => {
+                        if (el.style.background === '#ffffff' || el.style.background === surface || !el.style.background) el.style.background = surface;
+                    });
+                    document.querySelectorAll('.font-display').forEach(el => { el.style.color = text; });
+                    document.querySelectorAll('[style*="color:#1e293b"]').forEach(el => { el.style.color = text; });
+
+                    document.querySelectorAll('button[style*="background:#4f46e5"], span[style*="background:#4f46e5"]').forEach(el => { el.style.background = primary; });
+                    document.querySelectorAll('.tab-active').forEach(el => { el.style.borderColor = primary; el.style.color = primary; });
+                    document.querySelectorAll('span[style*="color:#4f46e5"]').forEach(el => { el.style.color = primary; });
+                    document.querySelectorAll('span[style*="background:#e0e7ff"]').forEach(el => { el.style.background = primary + '20'; el.style.color = primary; });
+
+                    document.querySelectorAll('[style*="color:#64748b"]').forEach(el => { el.style.color = secondary; });
+
+                    document.body.style.fontFamily = `${font}, DM Sans, sans-serif`;
+                    const baseSize = fs;
+                    document.querySelectorAll('.text-sm').forEach(el => { el.style.fontSize = `${baseSize}px`; });
+                    document.querySelectorAll('.text-xs').forEach(el => { el.style.fontSize = `${baseSize * 0.85}px`; });
+                    document.querySelectorAll('.text-2xl').forEach(el => { el.style.fontSize = `${baseSize * 1.7}px`; });
+                    document.querySelectorAll('.text-lg').forEach(el => { el.style.fontSize = `${baseSize * 1.15}px`; });
+
+                    const sn = config.school_name || defaultConfig.school_name;
+                    const rt = config.report_title || defaultConfig.report_title;
+                    const ay = config.academic_year || defaultConfig.academic_year;
+                    document.getElementById('school-name-display').textContent = sn;
+                    document.getElementById('report-title-display').textContent = rt;
+                    document.getElementById('year-badge').textContent = ay;
+
+                    renderAll();
+                },
+                mapToCapabilities: (config) => ({
+                    recolorables: [
+                        { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+                        { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+                        { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+                        { get: () => config.primary_action_color || defaultConfig.primary_action_color, set: (v) => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); } },
+                        { get: () => config.secondary_action_color || defaultConfig.secondary_action_color, set: (v) => { config.secondary_action_color = v; window.elementSdk.setConfig({ secondary_action_color: v }); } }
+                    ],
+                    borderables: [],
+                    fontEditable: {
+                        get: () => config.font_family || defaultConfig.font_family,
+                        set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
+                    },
+                    fontSizeable: {
+                        get: () => config.font_size || defaultConfig.font_size,
+                        set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); }
+                    }
+                }),
+                mapToEditPanelValues: (config) => new Map([
+                    ['school_name', config.school_name || defaultConfig.school_name],
+                    ['report_title', config.report_title || defaultConfig.report_title],
+                    ['academic_year', config.academic_year || defaultConfig.academic_year]
+                ])
+            });
+        }
+
+        // ========== DATA INIT ==========
+        (async () => {
+            try {
+                // Auth: require login before syncing with backend
+                const authBtn = document.getElementById('btn-auth-login');
+                const authErr = document.getElementById('auth-error');
+                const userInp = document.getElementById('auth-username');
+                const passInp = document.getElementById('auth-password');
+
+                async function handleLogin() {
+                    authErr.classList.add('hidden');
+                    try {
+                        await login(userInp.value.trim(), passInp.value);
+                        // After login, load fresh data
+                        students = await StudentDB.getAll();
+                        await StudentDB.save(students);
+                        const records = await LocalDB.getAll();
+                        allRecords = records;
+                        updateStudentFilterOptions();
+                        renderAll();
+                    } catch (e) {
+                        authErr.textContent = e.message || 'Login failed';
+                        authErr.classList.remove('hidden');
+                    }
+                }
+
+                authBtn.addEventListener('click', handleLogin);
+                [userInp, passInp].forEach(el => el.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') handleLogin();
+                }));
+
+                if (!getToken()) showAuthOverlay();
+
+                // Setup logo management
+                await setupLogoManager();
+                // Initialize settings tab
+                await initSettings();
+                // Attempt to pre-convert initial logo (might fail on file:// origin)
+                await convertLogoToBase64();
+
+                // Load Settings
+                const settings = await SettingsDB.get();
+                if (settings.academic_year) document.getElementById('inp-academic-year').value = settings.academic_year;
+
+                // Load Students
+                students = await StudentDB.getAll();
+                renderStudents();
+                updateEntryStudentSelect();
+                generateRegLID();
+
+                const localData = await LocalDB.getAll();
+                if (localData && localData.length > 0) {
+                    allRecords = localData;
+                    updateStudentFilterOptions();
+                    renderAll();
+                }
+            } catch (e) {
+                console.error('LocalDB init error:', e);
+            }
+            
+            if (window.dataSdk) {
+                try {
+                    await window.dataSdk.init({
+                        onDataChanged(data) {
+                            if (data && Array.isArray(data)) {
+                                if (data.length > 0) {
+                                    allRecords = data;
+                                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                                    updateStudentFilterOptions();
+                                    renderAll();
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Data SDK init error:', e);
+                }
+            }
+            
+            renderAll();
+        })();
+
+        // ========== SETTINGS LOGIC ==========
+        document.getElementById('inp-academic-year').addEventListener('input', (e) => {
+            SettingsDB.save({ academic_year: e.target.value.trim() }).catch(() => {});
+        });
+
+        // ========== STUDENT MANAGEMENT LOGIC ==========
+        function generateRegLID() {
+            const randomDigits = Math.floor(1000 + Math.random() * 9000);
+            const id = `LID${randomDigits}`;
+            document.getElementById('reg-id').value = id;
+            return id;
+        }
+
+        document.getElementById('btn-regen-reg-id').addEventListener('click', generateRegLID);
+
+        document.getElementById('student-reg-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('reg-name').value.trim();
+            const cls = document.getElementById('reg-class').value;
+            const id = document.getElementById('reg-id').value;
+
+            if (students.some(s => s.id === id)) {
+                showToast('Student ID already exists', 'error');
+                return;
+            }
+
+            try {
+                await StudentDB.create({ name, class: cls, id });
+                showToast(`${name} registered successfully`);
+                document.getElementById('reg-name').value = '';
+                generateRegLID();
+            } catch (error) {
+                if (error.message.includes('Student already exists')) {
+                    showToast('Student ID already exists in the database', 'error');
+                } else {
+                    showToast('Failed to register student: ' + error.message, 'error');
+                }
+            }
+        });
+
+        function renderStudents() {
+            const tbody = document.getElementById('student-mgmt-tbody');
+            const empty = document.getElementById('student-empty-state');
+            
+            const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
+            let totalRendered = 0;
+            tbody.innerHTML = '';
+
+            classes.forEach(cls => {
+                // If filtering by a specific class, skip others
+                if (currentRegFilter !== 'all' && currentRegFilter !== cls) return;
+
+                const classStudents = students.filter(s => s.class === cls);
+                if (classStudents.length > 0) {
+                    // Add Category Header Row
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'bg-slate-50 border-y border-slate-100';
+                    headerRow.innerHTML = `
+                        <td colspan="4" class="px-6 py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">${cls}</span>
+                                <span class="h-px flex-1 bg-slate-200"></span>
+                                <span class="text-[10px] font-bold text-slate-400">${classStudents.length} Students</span>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(headerRow);
+
+                    // Add Student Rows
+                    classStudents.forEach(s => {
+                        const row = document.createElement('tr');
+                        row.className = 'hover:bg-slate-50/50 transition-colors';
+                        row.style.borderTop = '1px solid #f1f5f9';
+                        row.innerHTML = `
+                            <td class="px-6 py-3 font-mono text-xs font-bold text-indigo-600">${s.id}</td>
+                            <td class="px-6 py-3 font-medium text-slate-900">${s.name}</td>
+                            <td class="px-6 py-3 text-xs font-semibold text-slate-500">${s.class}</td>
+                            <td class="text-center px-4 py-3">
+                                <button class="del-student-btn rounded-lg p-1.5 transition-colors" style="color:#dc2626;background:#fef2f2;" data-id="${s.id}">
+                                    <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                        totalRendered++;
+                    });
+                }
+            });
+
+            if (totalRendered === 0) {
+                empty.classList.remove('hidden');
+            } else {
+                empty.classList.add('hidden');
+            }
+            
+            lucide.createIcons({ nodes: [tbody] });
+
+            tbody.querySelectorAll('.del-student-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    if (confirm('Delete student and all their grades?')) {
+                        const id = btn.dataset.id;
+                        await StudentDB.delete(id);
+                        // Also clear their grades
+                        let records = await LocalDB.getAll();
+                        records = records.filter(r => r.student_id !== id);
+                        await LocalDB.save(records);
+                        showToast('Student removed', 'warning');
+                    }
+                };
+            });
+        }
+
+        document.getElementById('filter-reg-class').addEventListener('change', (e) => {
+            currentRegFilter = e.target.value;
+            renderStudents();
+        });
+
+        // ========== GRADE ENTRY STUDENT SELECT LOGIC ==========
+        function updateEntryStudentSelect() {
+            const classSelect = document.getElementById('inp-class');
+            const studentSelect = document.getElementById('inp-student-select');
+            const reportSelect = document.getElementById('report-student-select');
+            const selectedClass = classSelect.value;
+
+            // Update Entry Select
+            if (!selectedClass) {
+                studentSelect.innerHTML = '<option value="">Select Class First</option>';
+                studentSelect.disabled = true;
+            } else {
+                const classStudents = students.filter(s => s.class === selectedClass);
+                studentSelect.innerHTML = '<option value="">Select a student...</option>' + 
+                    classStudents.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+                studentSelect.disabled = false;
+            }
+
+            // Update Report Select (Always show all students)
+            const allStudentsOpts = '<option value="">Select a student...</option>' + 
+                students.map(s => `<option value="${s.id}">${s.name} (${s.id}) — ${s.class}</option>`).join('');
+            reportSelect.innerHTML = allStudentsOpts;
+            if (selectedStudentId) reportSelect.value = selectedStudentId;
+        }
+
+        document.getElementById('inp-class').addEventListener('change', () => {
+            updateEntryStudentSelect();
+            selectedStudentId = null;
+            updateSelectedStudentUI();
+        });
+
+        document.getElementById('inp-student-select').addEventListener('change', (e) => {
+            selectedStudentId = e.target.value;
+            document.getElementById('report-student-select').value = selectedStudentId;
+            updateSelectedStudentUI();
+            currentFilter = selectedStudentId || 'all';
+            renderAll();
+        });
+
+        document.getElementById('report-student-select').addEventListener('change', (e) => {
+            selectedStudentId = e.target.value;
+            updateSelectedStudentUI();
+            currentFilter = selectedStudentId || 'all';
+            renderAll();
+            buildReport();
+        });
+
+        function updateSelectedStudentUI() {
+            const details = document.getElementById('selected-student-details');
+            const nameEl = document.getElementById('display-selected-name');
+            const idEl = document.getElementById('display-selected-id');
+
+            if (selectedStudentId) {
+                const s = students.find(s => s.id === selectedStudentId);
+                nameEl.textContent = s.name;
+                idEl.textContent = s.id;
+                details.classList.remove('hidden');
+            } else {
+                details.classList.add('hidden');
+            }
+        }
+
+        // ========== FILTER LOGIC ==========
+        document.getElementById('filter-student').addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+            renderAll();
+            // Refresh report and analytics if they are visible
+            if (!document.getElementById('tab-report').classList.contains('hidden')) {
+                buildReport();
+                buildAnalytics();
+            }
+            if (!document.getElementById('tab-analytics').classList.contains('hidden')) {
+                buildAnalytics();
+            }
+        });
+
+        // ========== CLEAR DB LOGIC ==========
+        document.getElementById('btn-clear-db').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear ALL data? This cannot be undone.')) {
+                await LocalDB.clearAll();
+                showToast('All data cleared', 'warning');
+            }
+        });
+
+        // ========== TOAST ==========
+        function showToast(msg, type = 'success') {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast-slide rounded-lg px-4 py-3 shadow-lg flex items-center gap-2 mb-2';
+            const bg = type === 'error' ? '#fef2f2' : type === 'warning' ? '#fffbeb' : '#ecfdf5';
+            const col = type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : '#059669';
+            t.style.cssText = `background:${bg};border:1px solid ${col}30;color:${col};font-size:13px;`;
+            const icon = type === 'error' ? 'alert-circle' : type === 'warning' ? 'alert-triangle' : 'check-circle';
+            t.innerHTML = `<i data-lucide="${icon}" style="width:16px;height:16px;flex-shrink:0;"></i> <span>${msg}</span>`;
+            c.appendChild(t);
+            lucide.createIcons({ nodes: [t] });
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ========== TABS ==========
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => { 
+                    b.classList.remove('tab-active'); 
+                    b.style.color = '#64748b'; 
+                    b.style.borderColor = 'transparent'; 
+                });
+                
+                btn.classList.add('tab-active');
+                
+                // Safe access to primary color
+                const cfg = (window.elementSdk && window.elementSdk.config) ? window.elementSdk.config : defaultConfig;
+                const primary = cfg.primary_action_color || defaultConfig.primary_action_color;
+                
+                btn.style.color = primary;
+                btn.style.borderColor = primary;
+                
+                ['students', 'entry', 'report', 'analytics', 'settings'].forEach(t => {
+                    const el = document.getElementById('tab-' + t);
+                    if (el) {
+                        if (t === tab) { 
+                            el.classList.remove('hidden'); 
+                            el.classList.add('fade-in'); 
+                        } else {
+                            el.classList.add('hidden');
+                        }
+                    }
+                });
+                
+                if (tab === 'report') {
+                    try {
+                        buildReport();
+                        // buildAnalytics(); // Removed from report tab as requested
+                    } catch (e) {
+                        console.error('Error building report:', e);
+                    }
+                }
+                if (tab === 'analytics') {
+                    try {
+                        buildAnalytics();
+                    } catch (e) {
+                        console.error('Error building analytics:', e);
+                    }
+                }
+            });
+        });
+
+        // ========== ADD SCORE ==========
+        document.getElementById('score-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (isLoading) return;
+
+            if (!selectedStudentId) {
+                showToast('Please select a student first', 'error');
+                return;
+            }
+
+            const student = students.find(s => s.id === selectedStudentId);
+            const name = student.name;
+            const sid = student.id;
+            const cls = student.class;
+            const term = document.getElementById('inp-term').value;
+            const academicYear = document.getElementById('inp-academic-year').value.trim() || '2025/2026';
+            const subject = document.getElementById('inp-subject').value.trim();
+            const scoreVal = parseInt(document.getElementById('inp-score').value);
+
+            if (!subject) {
+                showToast('Please enter a subject', 'error');
+                return;
+            }
+            if (!term) {
+                showToast('Please select a term', 'error');
+                return;
+            }
+            if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100) {
+                showToast('Score must be between 0 and 100', 'error');
+                return;
+            }
+            if (allRecords.length >= 999) {
+                showToast('Maximum 999 records reached. Delete some first.', 'warning');
+                return;
+            }
+
+            const g = calcGrade(scoreVal, cls);
+            isLoading = true;
+            document.getElementById('btn-add').disabled = true;
+            document.getElementById('btn-add').innerHTML = '<span class="animate-pulse">Adding...</span>';
+
+            const payload = {
+                student_name: name,
+                student_id: sid,
+                student_class: cls,
+                term: term,
+                academic_year: academicYear,
+                subject: subject,
+                score: scoreVal,
+                grade: g.grade,
+                result: g.result,
+                points: g.points,
+                teacher_comment: document.getElementById('inp-teacher-comment').value.trim(),
+                created_at: new Date().toISOString()
+            };
+
+            const result = await LocalDB.create(payload);
+            
+            // Sync with dataSdk if available
+            if (window.dataSdk) window.dataSdk.create(payload).catch(e => console.error('Sync failed', e));
+
+            isLoading = false;
+            document.getElementById('btn-add').disabled = false;
+            document.getElementById('btn-add').innerHTML = '<i data-lucide="plus" style="width:16px;height:16px;"></i> Add Score';
+            lucide.createIcons({ nodes: [document.getElementById('btn-add')] });
+
+            if (result.isOk) {
+                showToast(`${subject} score added successfully!`);
+                document.getElementById('inp-subject').value = '';
+                document.getElementById('inp-score').value = '';
+                document.getElementById('inp-teacher-comment').value = '';
+                document.getElementById('inp-subject').focus();
+            } else {
+                showToast('Failed to save. Please try again.', 'error');
+            }
+        });
+
+        // ========== DELETE ==========
+        document.getElementById('btn-cancel-del').addEventListener('click', () => {
+            document.getElementById('delete-overlay').classList.add('hidden');
+            deleteTarget = null;
+        });
+
+        document.getElementById('btn-confirm-del').addEventListener('click', async () => {
+            if (!deleteTarget) return;
+            document.getElementById('btn-confirm-del').textContent = 'Deleting...';
+            document.getElementById('btn-confirm-del').disabled = true;
+            
+            const res = await LocalDB.delete(deleteTarget.__backendId);
+            if (window.dataSdk) window.dataSdk.delete(deleteTarget).catch(e => console.error('Sync delete failed', e));
+
+            document.getElementById('btn-confirm-del').textContent = 'Delete';
+            document.getElementById('btn-confirm-del').disabled = false;
+            document.getElementById('delete-overlay').classList.add('hidden');
+            if (res.isOk) showToast('Grade deleted');
+            else showToast('Failed to delete', 'error');
+            deleteTarget = null;
+        });
+
+        // ========== PRINT & DOWNLOAD ==========
+        document.getElementById('btn-print').addEventListener('click', () => window.print());
+
+        const exportToggle = document.getElementById('btn-export-toggle');
+        const exportMenu = document.getElementById('export-menu');
+
+        exportToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportMenu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', () => exportMenu.classList.add('hidden'));
+
+        // PDF Export
+        document.getElementById('export-pdf').addEventListener('click', async () => {
+            const element = document.getElementById('print-report');
+            const student = students.find(s => s.id === selectedStudentId);
+            const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Report.pdf` : 'Student_Report.pdf';
+            
+            // Improved settings for PDF generation
+            const opt = {
+                margin: [0, 0],
+                filename: fileName,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 3, 
+                    useCORS: true, 
+                    logging: false,
+                    letterRendering: true,
+                    allowTaint: false, // Must be false to allow export
+                    scrollX: 0,
+                    scrollY: 0
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', precision: 32 }
+            };
+
+            showToast('Generating high-quality PDF...', 'info');
+            try {
+                // Generate and save
+                const worker = html2pdf().set(opt).from(element);
+                await worker.save();
+                showToast('PDF downloaded successfully');
+            } catch (e) {
+                console.error('PDF Error:', e);
+                showToast('PDF generation failed. Try uploading your logo manually via the camera icon.', 'error');
+            }
+        });
+
+        // Word Export
+        document.getElementById('export-word').addEventListener('click', () => {
+            const content = document.getElementById('print-report').innerHTML;
+            const student = students.find(s => s.id === selectedStudentId);
+            const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Report.doc` : 'Student_Report.doc';
+            
+            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>Export to Word</title>
+                <style>
+                    body { font-family: 'DM Sans', sans-serif; }
+                    table { border-collapse: collapse; width: 100%; }
+                    th, td { border: 1px solid #e2e8f0; padding: 8px; }
+                    .bg-slate-900 { background-color: #0f172a; color: white; }
+                </style>
+                </head><body>`;
+            const footer = "</body></html>";
+            const sourceHTML = header + content + footer;
+            
+            const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('Word document downloaded');
+        });
+
+        // Image Export
+        document.getElementById('export-image').addEventListener('click', async () => {
+            const element = document.getElementById('print-report');
+            const student = students.find(s => s.id === selectedStudentId);
+            const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Report.png` : 'Student_Report.png';
+
+            showToast('Generating Image...', 'info');
+            try {
+                const canvas = await html2canvas(element, { 
+                    scale: 2, 
+                    useCORS: true, 
+                    allowTaint: false,
+                    scrollX: 0,
+                    scrollY: 0
+                });
+                const url = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.click();
+                showToast('Image downloaded successfully');
+            } catch (e) {
+                showToast('Image generation failed. Try uploading your logo manually.', 'error');
+            }
+        });
+
+        // CSV Export
+        document.getElementById('export-csv').addEventListener('click', () => {
+            const reportRecords = allRecords.filter(r => r.student_id === selectedStudentId);
+            if (reportRecords.length === 0) return;
+
+            const student = students.find(s => s.id === selectedStudentId);
+            const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Grades.csv` : 'Student_Grades.csv';
+
+            let csv = 'Subject,Score,Grade,Points,Result,Comment\n';
+            reportRecords.forEach(r => {
+                const g = calcGrade(r.score, student.class);
+                csv += `"${r.subject}",${r.score},"${g.grade}",${g.points},"${g.result}","${r.teacher_comment || ''}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV data downloaded');
+        });
+
+        // ========== RENDER GRADES TABLE ==========
+        function updateStudentFilterOptions() {
+            const filter = document.getElementById('filter-student');
+            if (!filter) return;
+            const students = [...new Set(allRecords.map(r => r.student_id))].sort();
+            const currentVal = filter.value;
+            filter.innerHTML = '<option value="all">All Students</option>';
+            students.forEach(id => {
+                const rec = allRecords.find(r => r.student_id === id);
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `${rec.student_name} (${id})`;
+                filter.appendChild(opt);
+            });
+            if ([...filter.options].some(o => o.value === currentVal)) filter.value = currentVal;
+        }
+
+        function renderAll() {
+            const tbody = document.getElementById('grades-tbody');
+            const empty = document.getElementById('empty-state');
+            const summary = document.getElementById('summary-row');
+            const countBadge = document.getElementById('entry-count');
+
+            const filteredRecords = currentFilter === 'all'
+                ? allRecords
+                : allRecords.filter(r => r.student_id === currentFilter);
+
+            if (filteredRecords.length === 0) {
+                tbody.innerHTML = '';
+                empty.classList.remove('hidden');
+                summary.classList.add('hidden');
+                countBadge.textContent = '0 subjects';
+                return;
+            }
+
+            empty.classList.add('hidden');
+            summary.classList.remove('hidden');
+            countBadge.textContent = `${filteredRecords.length} subject${filteredRecords.length !== 1 ? 's' : ''}`;
+
+            // Selective DOM update
+            const existingRows = new Map([...tbody.querySelectorAll('tr[data-rid]')].map(r => [r.dataset.rid, r]));
+            const currentIds = new Set();
+
+            filteredRecords.forEach((rec, i) => {
+                const rid = rec.__backendId;
+                currentIds.add(rid);
+                const g = calcGrade(rec.score, rec.student_class);
+
+                if (existingRows.has(rid)) {
+                    const row = existingRows.get(rid);
+                    const cells = row.querySelectorAll('td');
+                    cells[0].querySelector('.subj-name').textContent = rec.subject;
+                    cells[0].querySelector('.stu-info').textContent = currentFilter === 'all' ? `${rec.student_name} (${rec.student_id})` : '';
+                    cells[1].textContent = rec.score;
+                    cells[2].querySelector('span').textContent = g.grade;
+                    cells[3].textContent = ['FORM 1', 'FORM 2'].includes(rec.student_class) ? 'GRADE ' + g.grade : g.points.toFixed(1);
+                    const badge = cells[4].querySelector('span');
+                    badge.textContent = g.result;
+                    badge.style.background = resultBg(g.result);
+                    badge.style.color = resultColor(g.result);
+                } else {
+                    const row = document.createElement('tr');
+                    row.dataset.rid = rid;
+                    row.style.borderTop = '1px solid #f1f5f9';
+                    row.innerHTML = `
+        <td class="px-6 py-3">
+            <div class="font-medium" style="color:#1e293b;"><span class="subj-name">${rec.subject}</span></div>
+            <div class="text-[10px] text-slate-400 stu-info">${currentFilter === 'all' ? `${rec.student_name} (${rec.student_id})` : ''}</div>
+        </td>
+        <td class="text-center px-4 py-3" style="color:#1e293b;font-weight:600;">${rec.score}</td>
+        <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f1f5f9;color:#1e293b;">${g.grade}</span></td>
+        <td class="text-center px-4 py-3" style="color:#1e293b;">${['FORM 1', 'FORM 2'].includes(rec.student_class) ? 'GRADE ' + g.grade : g.points.toFixed(1)}</td>
+        <td class="text-center px-4 py-3"><span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.result}</span></td>
+        <td class="px-4 py-3"><span class="text-sm" style="color:#64748b;">${rec.teacher_comment || '—'}</span></td>
+        <td class="text-center px-4 py-3"><button class="del-btn rounded-lg p-1.5 transition-colors" style="color:#dc2626;background:#fef2f2;" data-rid="${rid}"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button></td>
+      `;
+                    tbody.appendChild(row);
+                    lucide.createIcons({ nodes: [row] });
+                }
+            });
+
+            existingRows.forEach((row, rid) => { if (!currentIds.has(rid)) row.remove(); });
+
+            // Attach delete handlers
+            tbody.querySelectorAll('.del-btn').forEach(btn => {
+                btn.onclick = () => {
+                    deleteTarget = allRecords.find(r => r.__backendId === btn.dataset.rid);
+                    if (deleteTarget) document.getElementById('delete-overlay').classList.remove('hidden');
+                };
+            });
+
+            // Summary
+            const scores = filteredRecords.map(r => r.score);
+            const points = filteredRecords.map(r => calcGrade(r.score, r.student_class).points);
+            const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+            const gpa = points.reduce((a, b) => a + b, 0) / points.length;
+
+            let studentClass = null;
+            if (currentFilter !== 'all') {
+                const student = students.find(s => s.id === currentFilter);
+                studentClass = student ? student.class : null;
+            }
+
+            const isForm1Or2 = studentClass && ['FORM 1', 'FORM 2'].includes(studentClass);
+
+            document.getElementById('sum-total').textContent = filteredRecords.length;
+            document.getElementById('sum-avg').textContent = avg.toFixed(1) + '%';
+            document.getElementById('sum-high').textContent = Math.max(...scores) + '%';
+            document.getElementById('sum-low').textContent = Math.min(...scores) + '%';
+            if (isForm1Or2) {
+                const avgAll = scores.reduce((a, b) => a + b, 0) / scores.length;
+                const overallGrade = 'GRADE ' + calcGrade(avgAll, studentClass).grade;
+                const passes = points.filter(p => p === 1).length;
+                const englishRecord = filteredRecords.find(r => r.subject.toLowerCase().includes('english'));
+                const englishPass = englishRecord ? calcGrade(englishRecord.score, studentClass).result === 'PASS' : false;
+                const overall = englishPass && passes >= 6 ? 'PASSED' : 'FAILED';
+                document.getElementById('sum-pts').textContent = overallGrade;
+                document.getElementById('sum-gpa').textContent = overall;
+                const orEl = document.getElementById('sum-result');
+                orEl.textContent = overall;
+                orEl.style.color = overall === 'PASSED' ? '#059669' : '#dc2626';
+            } else {
+                document.getElementById('sum-pts').textContent = points.reduce((a, b) => a + b, 0).toFixed(1);
+                document.getElementById('sum-gpa').textContent = gpa.toFixed(2);
+                const or = overallResult(gpa);
+                const orEl = document.getElementById('sum-result');
+                orEl.textContent = or;
+                orEl.style.color = gpa >= 3.0 ? '#059669' : gpa >= 2.0 ? '#d97706' : '#dc2626';
+            }
+        }
+
+        // ========== BUILD REPORT ==========
+        function buildReport() {
+            const c = document.getElementById('report-content');
+            
+            const reportRecords = allRecords.filter(r => r.student_id === selectedStudentId);
+
+            if (!selectedStudentId || reportRecords.length === 0) {
+                c.innerHTML = '<p class="text-center text-sm py-20" style="color:#94a3b8;">Select a student with grades in the "Enter Grades" tab to generate their A4 report.</p>';
+                return;
+            }
+
+            const cfg = (window.elementSdk && window.elementSdk.config) ? window.elementSdk.config : defaultConfig;
+            const sn = cfg.school_name || defaultConfig.school_name;
+            const rt = "PROGRESS REPORT CARD";
+            const r0 = reportRecords[0];
+            const ay = r0.academic_year || cfg.academic_year || defaultConfig.academic_year;
+            
+            const student = students.find(s => s.id === selectedStudentId);
+            const scores = reportRecords.map(r => r.score);
+            const grades = reportRecords.map(r => calcGrade(r.score, student.class));
+            const points = grades.map(g => g.points);
+            
+            const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(student.class);
+            
+            let aggregate;
+            if (isForm1Or2) {
+                // Aggregate from all subjects as single letter grade
+                const avgAll = scores.reduce((a, b) => a + b, 0) / scores.length;
+                aggregate = 'GRADE ' + calcGrade(avgAll, student.class).grade;
+            } else {
+                // Best 6 Grades Aggregate as sum
+                const sortedPoints = [...points].sort((a, b) => a - b);
+                const best6 = sortedPoints.slice(0, 6);
+                aggregate = best6.reduce((a, b) => a + b, 0);
+            }
+
+            const autoComment = (res) => {
+                if (res === 'DIST') return 'Outstanding Performance';
+                if (res === 'STRONG CREDIT') return 'Excellent Achievement';
+                if (res === 'CRED') return 'Very Good Progress';
+                if (res === 'PASS') return 'Satisfactory; Needs Focus';
+                return 'Requires Urgent Attention';
+            };
+
+            let rows = reportRecords.map((r, i) => {
+                const g = calcGrade(r.score, student.class);
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+                    <td class="px-3 py-2 text-[11px] text-center border-r border-slate-100 font-medium">${i + 1}</td>
+                    <td class="px-3 py-2 text-[11px] font-bold border-r border-slate-100 uppercase text-slate-700">${r.subject}</td>
+                    <td class="text-center px-3 py-2 text-[12px] font-black border-r border-slate-100 text-indigo-900 bg-slate-50/50">${r.score}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-bold">${g.grade}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-black uppercase" style="color:${resultColor(g.result)}">${g.result}</td>
+                    <td class="px-3 py-2 text-[10px] italic font-medium" style="color:#64748b;">${r.teacher_comment || autoComment(g.result)}</td>
+                </tr>`;
+            }).join('');
+
+            // Handle logo display based on whether it's safe for canvas export
+            const isDataURL = logoDataURL.startsWith('data:');
+            const logoHTML = isDataURL 
+                ? `<img src="${logoDataURL}" alt="Logo" class="h-20 w-20 object-contain drop-shadow-sm" onerror="this.style.display='none'">`
+                : `<div class="h-20 w-20 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-[9px] text-center font-bold uppercase p-2 text-slate-400">
+                     Manual Logo
+                   </div>`;
+
+            c.innerHTML = `
+                <div class="flex flex-col h-full text-slate-900" style="font-family: 'DM Sans', sans-serif; font-size: 13px;">
+                    <!-- Header -->
+                    <div class="flex items-center gap-6 border-b-2 border-indigo-600 pb-5 mb-5">
+                        ${logoHTML}
+                        <div class="flex-1 text-left">
+                            <h1 class="font-display text-2xl font-black uppercase tracking-tight leading-none mb-1" style="color:#1e1b4b;">${sn}</h1>
+                            <div class="flex items-center gap-3 mb-2">
+                                <h2 class="text-base font-black text-indigo-600 uppercase tracking-[0.1em]">${rt}</h2>
+                                <span class="h-px flex-1 bg-slate-200"></span>
+                            </div>
+                            <div class="flex gap-6 text-[11px] font-black text-slate-500 uppercase">
+                                <span class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3 h-3"></i> YEAR: <span class="text-indigo-900 border-b-2 border-indigo-100">${ay}</span></span>
+                                <span class="flex items-center gap-1.5"><i data-lucide="hash" class="w-3 h-3"></i> TERM: <span class="text-indigo-900 border-b-2 border-indigo-100">${r0.term.toUpperCase()}</span></span>
+                                <span class="flex items-center gap-1.5"><i data-lucide="graduation-cap" class="w-3 h-3"></i> CLASS: <span class="text-indigo-900 border-b-2 border-indigo-100">${student.class.toUpperCase()}</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student Info Box -->
+                    <div class="mb-5 flex items-center justify-between bg-slate-50 border-y border-slate-200 py-3 px-4 rounded-sm">
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student Name:</span>
+                            <span class="text-xl font-black text-slate-900 uppercase tracking-tight">${student.name}</span>
+                        </div>
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student ID:</span>
+                            <span class="text-base font-mono font-black text-indigo-700 bg-white px-3 py-0.5 border border-indigo-100 rounded-full shadow-sm">${student.id}</span>
+                        </div>
+                    </div>
+
+                    <!-- Subjects Table -->
+                    <div class="border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900 text-white">
+                                    <th class="px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-12">No#</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700">SUBJECT</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-20">SCORE (%)</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-16">GRADE</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-32">RESULT</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase">TEACHER'S COMMENT</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">${rows}</tbody>
+                        </table>
+                    </div>
+
+                    <!-- Aggregate Section -->
+                    <div class="mt-4 flex items-center justify-between border-2 border-indigo-100 p-4 bg-indigo-50/30 rounded-lg shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-md">
+                                <i data-lucide="award" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-black text-indigo-900 uppercase tracking-widest block">${isForm1Or2 ? 'OVERALL GRADE' : 'AGGREGATE FOR BEST 6 SUBJECTS'}</span>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase leading-none">Official performance metric</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white px-6 py-2 rounded-full border-2 border-indigo-200 shadow-inner">
+                            <span class="text-2xl font-black text-indigo-700">${aggregate}</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${isForm1Or2 ? 'GRADE' : 'POINTS'}</span>
+                        </div>
+                    </div>
+
+                    <!-- Grade Reference -->
+                    <div class="mt-auto pt-6">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">OFFICIAL GRADING SCALE</span>
+                            <span class="h-px flex-1 bg-slate-100"></span>
+                        </div>
+                        <table class="w-full border-collapse border border-slate-200 text-[9px] rounded-lg overflow-hidden shadow-sm">
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase w-20 text-slate-500">GRADE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">1</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">2</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">3</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">4</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">5</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">6</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">7</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">8</td>
+                                <td class="p-1.5 text-center font-bold text-red-600 bg-red-50/30">9</td>
+                            </tr>
+                            <tr class="text-slate-500 font-medium">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase text-slate-400">RANGE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">90-100</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">80-89</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">70-79</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">66-69</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">60-65</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">50-59</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">46-49</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">40-45</td>
+                                <td class="p-1.5 text-center bg-red-50/30">0-39</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="mt-6 border-t-2 border-slate-100 pt-4 flex justify-between items-end">
+                        <div class="text-left">
+                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-widest leading-none mb-1">Next Term Resumption:</p>
+                            <p class="text-sm font-black text-slate-900 uppercase">5th JANUARY, 2026</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-slate-400 italic">This is an electronically generated official report card of LIDOMA PRIVATE SECONDARY SCHOOL.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Re-initialize icons for the report content
+            lucide.createIcons({ nodes: [c] });
+        }
+
+        // ========== BUILD ANALYTICS ==========
+        function buildAnalytics() {
+            const c = document.getElementById('analytics-content');
+            const cAlt = document.getElementById('analytics-content-alt');
+            
+            const analyticRecords = currentFilter === 'all' 
+                ? allRecords 
+                : allRecords.filter(r => r.student_id === currentFilter);
+
+            if (analyticRecords.length === 0) {
+                const emptyMsg = '<p class="text-center text-sm py-12" style="color:#94a3b8;">Enter grades to see analytics.</p>';
+                if (c) c.innerHTML = emptyMsg;
+                if (cAlt) cAlt.innerHTML = emptyMsg;
+                return;
+            }
+
+            const scores = analyticRecords.map(r => r.score);
+            const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+            const maxScore = Math.max(...scores);
+
+            // Grade distribution
+            const dist = { 'Distinction': 0, 'Credit': 0, 'Pass': 0, 'Weak Pass': 0, 'Fail': 0 };
+            analyticRecords.forEach(r => { dist[calcGrade(r.score, r.student_class).result]++; });
+
+            // Bar chart
+            const bars = analyticRecords.map((r, i) => {
+                const pct = (r.score / 100) * 100;
+                const g = calcGrade(r.score, r.student_class);
+                return `<div class="flex flex-col items-center gap-1" style="flex:1;min-width:40px;max-width:80px;">
+      <span class="text-xs font-semibold" style="color:#1e293b;">${r.score}</span>
+      <div class="w-full rounded-t-md bar-animate" style="height:${Math.max(pct * 1.8, 8)}px;background:${resultColor(g.result)};animation-delay:${i * 0.08}s;"></div>
+      <span class="text-xs text-center truncate w-full" style="color:#64748b;" title="${r.subject}">${r.subject.length > 6 ? r.subject.slice(0, 6) + '…' : r.subject}</span>
+    </div>`;
+            }).join('');
+
+            // Distribution pills
+            const pills = Object.entries(dist).map(([k, v]) => {
+                if (v === 0) return '';
+                return `<div class="flex items-center gap-2 rounded-full px-3 py-1.5" style="background:${resultBg(k)};border:1px solid ${resultColor(k)}30;">
+      <span class="w-2.5 h-2.5 rounded-full" style="background:${resultColor(k)};"></span>
+      <span class="text-xs font-semibold" style="color:${resultColor(k)};">${k}: ${v}</span>
+    </div>`;
+            }).join('');
+
+            // Top performers/subjects
+            let topRows;
+            if (currentFilter === 'all') {
+                const studentMap = new Map();
+                analyticRecords.forEach(r => {
+                    if (!studentMap.has(r.student_id)) {
+                        studentMap.set(r.student_id, { name: r.student_name, class: r.student_class, scores: [], total: 0, count: 0 });
+                    }
+                    const s = studentMap.get(r.student_id);
+                    s.scores.push(r.score);
+                    s.total += r.score;
+                    s.count += 1;
+                });
+                const students = Array.from(studentMap.values()).map(s => ({ ...s, avg: s.total / s.count }));
+                students.sort((a, b) => b.avg - a.avg);
+                const classGroups = {};
+                students.forEach(s => {
+                    if (!classGroups[s.class]) classGroups[s.class] = [];
+                    classGroups[s.class].push(s);
+                });
+                topRows = '';
+                Object.keys(classGroups).sort().forEach(cls => {
+                    const topInClass = classGroups[cls].slice(0, 5);
+                    topRows += `<div class="mb-4"><h5 class="text-sm font-bold text-slate-700 mb-2">${cls}</h5>`;
+                    topInClass.forEach((s, i) => {
+                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                        topRows += `<div class="flex items-center justify-between py-2" style="border-bottom:1px solid #f1f5f9;">
+              <span class="text-sm" style="color:#1e293b;">${medal} ${s.name}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold" style="color:#059669;">${s.avg.toFixed(1)}%</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:#ecfdf5;color:#059669;">TOP</span>
+              </div>
+            </div>`;
+                    });
+                    topRows += '</div>';
+                });
+            } else {
+                const sorted = [...analyticRecords].sort((a, b) => b.score - a.score);
+                topRows = sorted.slice(0, 5).map((r, i) => {
+                    const g = calcGrade(r.score, r.student_class);
+                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                    return `<div class="flex items-center justify-between py-2" style="border-bottom:1px solid #f1f5f9;">
+              <span class="text-sm" style="color:#1e293b;">${medal} ${r.subject}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${r.score}%</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
+              </div>
+            </div>`;
+                }).join('');
+            }
+
+            const content = `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
+        <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
+          <span class="flex items-center gap-2"><i data-lucide="bar-chart-2" style="width:18px;height:18px;color:#4f46e5;"></i> Score Chart</span>
+        </h3>
+        <div class="flex items-end gap-2 justify-center" style="height:220px;padding-top:20px;">
+          ${bars}
+        </div>
+        <div class="mt-3 flex items-center justify-center gap-1">
+          <div class="h-px flex-1" style="background:#e2e8f0;"></div>
+          <span class="text-xs px-2" style="color:#94a3b8;">Average: ${avg.toFixed(1)}%</span>
+          <div class="h-px flex-1" style="background:#e2e8f0;"></div>
+        </div>
+      </div>
+      <div class="rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
+        <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
+          <span class="flex items-center gap-2"><i data-lucide="pie-chart" style="width:18px;height:18px;color:#4f46e5;"></i> Grade Distribution</span>
+        </h3>
+        <div class="flex flex-wrap gap-2 mb-6">${pills}</div>
+        <h4 class="text-xs font-semibold mb-3" style="color:#64748b;">${currentFilter === 'all' ? 'Top Performers' : 'Top Performing Subjects'}</h4>
+        ${topRows}
+      </div>
+    </div>
+    <div class="mt-6 rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
+      <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
+        <span class="flex items-center gap-2"><i data-lucide="target" style="width:18px;height:18px;color:#4f46e5;"></i> Performance Breakdown</span>
+      </h3>
+      <div class="space-y-3">
+        ${analyticRecords.map(r => {
+                const g = calcGrade(r.score, r.student_class);
+                return `<div>
+            <div class="flex justify-between mb-1">
+              <span class="text-sm" style="color:#1e293b;">${r.subject}</span>
+              <span class="text-xs font-semibold" style="color:${resultColor(g.result)};">${r.score}% — ${g.grade}</span>
+            </div>
+            <div class="w-full rounded-full" style="height:8px;background:#f1f5f9;">
+              <div class="rounded-full" style="width:${r.score}%;height:100%;background:${resultColor(g.result)};transition:width 0.5s ease;"></div>
+            </div>
+          </div>`;
+            }).join('')}
+      </div>
+    </div>
+  `;
+            if (c) c.innerHTML = content;
+            if (cAlt) cAlt.innerHTML = content;
+            lucide.createIcons();
+        }
+
+        // ========== SUBJECT DROPDOWN LOGIC ==========
+        // Force show datalist on focus for better UX
+        const subjInp = document.getElementById('inp-subject');
+        if (subjInp) {
+            subjInp.addEventListener('focus', function() {
+                if (this.value === '') {
+                    const val = this.value;
+                    this.value = ' ';
+                    this.value = val;
+                }
+            });
+        }
+
+        // Init icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
