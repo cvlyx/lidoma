@@ -674,12 +674,14 @@ def generate_reports(
             .where(GradeRecord.academic_year == academic_year)
         ).all()
         
-        if not records:
-            continue
-        
-        # Calculate statistics
-        scores = [r.score for r in records]
-        avg_score = sum(scores) / len(scores)
+        # Calculate statistics - include students even with no grades
+        if records:
+            scores = [r.score for r in records]
+            avg_score = sum(scores) / len(scores)
+        else:
+            # No grades yet - use 0 as average
+            avg_score = 0.0
+            scores = []
         
         # Calculate aggregate/points based on class
         is_form1_or_2 = student_class in ['FORM 1', 'FORM 2']
@@ -690,11 +692,15 @@ def generate_reports(
             points = None
         else:
             # For FORM 3&4: calculate best 6 points
-            grades = [calc_grade_backend(r.score, student_class) for r in records]
-            sorted_points = sorted([g['points'] for g in grades])
-            best6 = sorted_points[:6]
-            aggregate = sum(best6)
-            points = aggregate
+            if records:
+                grades = [calc_grade_backend(r.score, student_class) for r in records]
+                sorted_points = sorted([g['points'] for g in grades])
+                best6 = sorted_points[:6]
+                aggregate = sum(best6)
+                points = aggregate
+            else:
+                aggregate = 0.0
+                points = 0
         
         # Prepare report data
         report_data = {
@@ -713,10 +719,11 @@ def generate_reports(
                     "comment": r.teacher_comment
                 }
                 for r in records
-            ],
+            ] if records else [],
             "average_score": avg_score,
             "aggregate": aggregate,
-            "is_form1_or_2": is_form1_or_2
+            "is_form1_or_2": is_form1_or_2,
+            "has_grades": len(records) > 0
         }
         
         # Check if report already exists
