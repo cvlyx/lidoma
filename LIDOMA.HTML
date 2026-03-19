@@ -584,6 +584,82 @@
             </div>
         </div>
 
+        <!-- Tab: Reports Archive -->
+        <main id="tab-reports-archive" class="max-w-7xl mx-auto p-6 hidden fade-in">
+            <!-- Header with Actions -->
+            <div class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <h2 class="font-display text-xl font-bold" style="color:#1e293b;">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="folder-archive" style="width:24px;height:24px;color:#4f46e5;"></i>
+                            School Reports Archive
+                        </span>
+                    </h2>
+                    <div class="flex items-center gap-3">
+                        <button onclick="openGenerateReportModal()" 
+                            class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
+                            style="background:#4f46e5;color:#ffffff;">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                                Generate Reports
+                            </span>
+                        </button>
+                        <button onclick="downloadSelectedReports()" id="btn-download-selected" disabled
+                            class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
+                            style="background:#059669;color:#ffffff;">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="download" style="width:16px;height:16px;"></i>
+                                Download Selected (<span id="selected-count">0</span>)
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search and Filters -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <input type="text" id="report-search" placeholder="Search by student name or ID..." 
+                            class="w-full rounded-lg px-4 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;"
+                            oninput="debouncedSearch()">
+                    </div>
+                    <div>
+                        <select id="filter-class" onchange="loadReports()" 
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">All Classes</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="filter-term" onchange="loadReports()" 
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">All Terms</option>
+                            <option value="First Term">First Term</option>
+                            <option value="Second Term">Second Term</option>
+                            <option value="Third Term">Third Term</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Class Folders -->
+            <div id="class-folders-container" class="space-y-6">
+                <!-- Dynamically populated class sections -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="reports-empty-state" class="text-center py-20 hidden">
+                <i data-lucide="inbox" style="width:64px;height:64px;color:#cbd5e1;margin:0 auto;display:block;"></i>
+                <p class="mt-4 text-lg font-semibold" style="color:#64748b;">No reports found</p>
+                <p class="text-sm mt-2" style="color:#94a3b8;">Generate reports for a class to see them here</p>
+            </div>
+        </main>
+
         <!-- Tab: Settings -->
         <main id="tab-settings" class="max-w-3xl mx-auto p-6 hidden fade-in">
             <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
@@ -798,6 +874,94 @@
                             class="flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all hover:opacity-95 active:scale-95"
                             style="background:#4f46e5;color:#ffffff;">Save Changes</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Report Modal -->
+        <div id="generate-report-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center no-print"
+            style="background:rgba(15,23,42,0.75);">
+            <div class="rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl"
+                style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                        <i data-lucide="file-text" style="width:20px;height:20px;color:#4f46e5;"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-display text-lg font-bold" style="color:#0f172a;">Generate School Reports</h3>
+                        <p class="text-xs" style="color:#64748b;">Create reports for all students in a class</p>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Class</label>
+                        <select id="gen-class" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#0f172a;">
+                            <option value="">Choose a class...</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Term</label>
+                        <select id="gen-term" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#0f172a;">
+                            <option value="">Choose term...</option>
+                            <option value="First Term">First Term</option>
+                            <option value="Second Term">Second Term</option>
+                            <option value="Third Term">Third Term</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Academic Year</label>
+                        <input id="gen-year" type="text" placeholder="e.g. 2025/2026" 
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#0f172a;">
+                    </div>
+                    <div id="gen-position-option" class="hidden p-3 rounded-lg border" style="background:#fef3c7;border-color:#fcd34d;">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input id="gen-assign-positions" type="checkbox" class="rounded">
+                            <span class="text-sm font-semibold" style="color:#92400e;">Assign Positions (FORM 1 & FORM 2 only)</span>
+                        </label>
+                        <p class="text-[10px] mt-1" style="color:#92400e;">Automatically assign positions based on average scores</p>
+                    </div>
+                    <div id="generate-report-error" class="text-xs hidden" style="color:#dc2626;"></div>
+                    <div class="flex gap-3 pt-4 border-t border-slate-100">
+                        <button id="btn-cancel-generate" 
+                            class="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+                            style="border:1px solid #e2e8f0;color:#64748b;">Cancel</button>
+                        <button id="btn-save-generate"
+                            class="flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all hover:opacity-95 active:scale-95"
+                            style="background:#4f46e5;color:#ffffff;">Generate Reports</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Report Modal -->
+        <div id="view-report-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center no-print"
+            style="background:rgba(15,23,42,0.75);">
+            <div class="rounded-2xl p-6 max-w-4xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+                style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i data-lucide="eye" style="width:20px;height:20px;color:#4f46e5;"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-display text-lg font-bold" style="color:#0f172a;">Report Details</h3>
+                            <p class="text-xs" style="color:#64748b;">Student performance summary</p>
+                        </div>
+                    </div>
+                    <button onclick="closeViewReportModal()" 
+                        class="rounded-lg p-2 transition-colors hover:bg-slate-100">
+                        <i data-lucide="x" style="width:20px;height:20px;color:#64748b;"></i>
+                    </button>
+                </div>
+                <div id="view-report-content" class="space-y-4">
+                    <!-- Content will be populated dynamically -->
                 </div>
             </div>
         </div>
@@ -1668,6 +1832,353 @@
         // Edit grade modal event listeners
         document.getElementById('btn-cancel-edit-grade').addEventListener('click', closeEditGradeModal);
         document.getElementById('btn-save-edit-grade').addEventListener('click', saveEditedGrade);
+
+        // ========== REPORTS ARCHIVE ==========
+        let allReports = [];
+
+        async function loadReports() {
+            const search = document.getElementById('report-search').value;
+            const studentClass = document.getElementById('filter-class').value;
+            const term = document.getElementById('filter-term').value;
+            
+            try {
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+                if (studentClass) params.append('student_class', studentClass);
+                if (term) params.append('term', term);
+                
+                allReports = await apiRequest(`/api/reports?${params}`);
+                renderReportsByClass(allReports);
+            } catch (error) {
+                showToast('Failed to load reports: ' + error.message, 'error');
+            }
+        }
+
+        function renderReportsByClass(reports) {
+            const container = document.getElementById('class-folders-container');
+            const emptyState = document.getElementById('reports-empty-state');
+            const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
+            
+            container.innerHTML = '';
+            
+            if (reports.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            classes.forEach(cls => {
+                const classReports = reports.filter(r => r.student_class === cls);
+                if (classReports.length === 0) return;
+                
+                const folderId = `class-${cls.replace(/\s+/g, '-').toLowerCase()}`;
+                const chevronId = `chevron-${cls.replace(/\s+/g, '-').toLowerCase()}`;
+                
+                const folderHTML = `
+                    <div class="rounded-xl overflow-hidden" style="background:#ffffff;border:1px solid #e2e8f0;">
+                        <div class="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                            onclick="toggleClassFolder('${folderId}', '${chevronId}')">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="chevron-down" id="${chevronId}" style="width:20px;height:20px;color:#64748b;"></i>
+                                <i data-lucide="folder" style="width:24px;height:24px;color:#4f46e5;"></i>
+                                <div>
+                                    <h3 class="font-display text-lg font-bold" style="color:#1e293b;">${cls}</h3>
+                                    <p class="text-xs" style="color:#64748b;">${classReports.length} report${classReports.length !== 1 ? 's' : ''}</p>
+                                </div>
+                            </div>
+                            <button onclick="event.stopPropagation(); downloadClassReports('${cls}')"
+                                class="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors"
+                                style="background:#059669;color:#ffffff;">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="download" style="width:14px;height:14px;"></i>
+                                    Download All
+                                </span>
+                            </button>
+                        </div>
+                        <div id="${folderId}" class="class-folder-content px-6 pb-4">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th class="text-left px-4 py-3 w-10"><input type="checkbox" onchange="toggleClassSelection('${folderId}', this.checked)"></th>
+                                        <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Pos</th>
+                                        <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student Name</th>
+                                        <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student ID</th>
+                                        <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Term</th>
+                                        <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Average</th>
+                                        <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Aggregate</th>
+                                        <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${classReports.map(r => createReportRow(r)).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', folderHTML);
+            });
+            
+            lucide.createIcons();
+        }
+
+        function createReportRow(report) {
+            const pos = report.position ? `#${report.position}` : '<span class="text-slate-400">-</span>';
+            const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(report.student_class);
+            
+            return `
+                <tr style="border-top:1px solid #f1f5f9;" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-3"><input type="checkbox" class="report-checkbox" data-report-id="${report.id}" onchange="updateSelectedCount()"></td>
+                    <td class="px-4 py-3">${isForm1Or2 ? `<span class="font-bold ${report.position && report.position <= 3 ? 'text-indigo-600' : ''}">${pos}</span>` : pos}</td>
+                    <td class="px-4 py-3 font-medium" style="color:#1e293b;">${report.student_name}</td>
+                    <td class="px-4 py-3 font-mono text-xs" style="color:#64748b;">${report.student_id}</td>
+                    <td class="text-center px-4 py-3 text-xs" style="color:#64748b;">${report.term}</td>
+                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#eff6ff;color:#2563eb;">${report.average_score.toFixed(1)}%</span></td>
+                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f5f3ff;color:#7c3aed;">${report.aggregate_points.toFixed(1)}</span></td>
+                    <td class="text-center px-4 py-3">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="viewReport(${report.id})" title="View" class="rounded-lg p-1.5 transition-colors" style="background:#eff6ff;color:#2563eb;"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
+                            <button onclick="downloadReport(${report.id})" title="Download" class="rounded-lg p-1.5 transition-colors" style="background:#f0fdf4;color:#059669;"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
+                            ${isForm1Or2 ? `<button onclick="assignPosition(${report.id})" title="Assign Position" class="rounded-lg p-1.5 transition-colors" style="background:#fef3c7;color:#d97706;"><i data-lucide="award" style="width:14px;height:14px;"></i></button>` : ''}
+                            <button onclick="deleteReport(${report.id})" title="Delete" class="rounded-lg p-1.5 transition-colors" style="background:#fef2f2;color:#dc2626;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function toggleClassFolder(folderId, chevronId) {
+            const content = document.getElementById(folderId);
+            const chevron = document.getElementById(chevronId);
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                chevron.setAttribute('data-lucide', 'chevron-down');
+            } else {
+                content.style.display = 'none';
+                chevron.setAttribute('data-lucide', 'chevron-right');
+            }
+            lucide.createIcons();
+        }
+
+        function openGenerateReportModal() {
+            document.getElementById('gen-class').value = '';
+            document.getElementById('gen-term').value = '';
+            document.getElementById('gen-year').value = '';
+            document.getElementById('generate-report-error').classList.add('hidden');
+            document.getElementById('gen-position-option').classList.add('hidden');
+            const overlay = document.getElementById('generate-report-overlay');
+            overlay.classList.remove('hidden');
+            lucide.createIcons({ nodes: [overlay] });
+        }
+
+        function closeGenerateReportModal() {
+            document.getElementById('generate-report-overlay').classList.add('hidden');
+        }
+
+        document.getElementById('gen-class').addEventListener('change', (e) => {
+            const posOption = document.getElementById('gen-position-option');
+            if (['FORM 1', 'FORM 2'].includes(e.target.value)) {
+                posOption.classList.remove('hidden');
+            } else {
+                posOption.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-save-generate').addEventListener('click', async () => {
+            const studentClass = document.getElementById('gen-class').value;
+            const term = document.getElementById('gen-term').value;
+            const academicYear = document.getElementById('gen-year').value.trim();
+            const assignPositions = document.getElementById('gen-assign-positions').checked;
+            const errorEl = document.getElementById('generate-report-error');
+
+            if (!studentClass || !term || !academicYear) {
+                errorEl.textContent = 'Please fill in all required fields';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('btn-save-generate');
+                btn.disabled = true;
+                btn.textContent = 'Generating...';
+
+                await apiRequest('/api/reports/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        student_class: studentClass,
+                        term: term,
+                        academic_year: academicYear,
+                        assign_positions: assignPositions && ['FORM 1', 'FORM 2'].includes(studentClass)
+                    })
+                });
+
+                showToast('Reports generated successfully!', 'success');
+                closeGenerateReportModal();
+                loadReports();
+            } catch (error) {
+                errorEl.textContent = error.message || 'Failed to generate reports';
+                errorEl.classList.remove('hidden');
+            } finally {
+                const btn = document.getElementById('btn-save-generate');
+                btn.disabled = false;
+                btn.textContent = 'Generate Reports';
+            }
+        });
+
+        document.getElementById('btn-cancel-generate').addEventListener('click', closeGenerateReportModal);
+
+        async function viewReport(reportId) {
+            try {
+                const report = await apiRequest(`/api/reports/${reportId}`);
+                const content = document.getElementById('view-report-content');
+                
+                content.innerHTML = `
+                    <div class="grid grid-cols-2 gap-4 p-4 rounded-lg" style="background:#f8fafc;">
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Student Name</p><p class="text-sm font-bold" style="color:#1e293b;">${report.student_name}</p></div>
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Student ID</p><p class="text-sm font-mono" style="color:#64748b;">${report.student_id}</p></div>
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Class</p><p class="text-sm" style="color:#1e293b;">${report.student_class}</p></div>
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Term & Year</p><p class="text-sm" style="color:#1e293b;">${report.term} ${report.academic_year}</p></div>
+                        ${report.position ? `<div><p class="text-xs font-semibold" style="color:#64748b;">Position</p><p class="text-lg font-black" style="color:#4f46e5;">#${report.position}</p></div>` : ''}
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Average Score</p><p class="text-lg font-black" style="color:#2563eb;">${report.average_score.toFixed(1)}%</p></div>
+                        <div><p class="text-xs font-semibold" style="color:#64748b;">Total Subjects</p><p class="text-sm" style="color:#1e293b;">${report.total_subjects}</p></div>
+                    </div>
+                    <h4 class="font-bold mt-4" style="color:#1e293b;">Subject Breakdown</h4>
+                    <div class="border rounded-lg overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead style="background:#1e293b;"><tr class="text-white"><th class="text-left px-4 py-2">Subject</th><th class="text-center px-4 py-2">Score</th><th class="text-center px-4 py-2">Grade</th><th class="text-center px-4 py-2">Result</th><th class="text-left px-4 py-2">Comment</th></tr></thead>
+                            <tbody>
+                                ${report.report_data.subjects.map(s => `<tr style="border-bottom:1px solid #f1f5f9;"><td class="px-4 py-2 font-medium" style="color:#1e293b;">${s.subject}</td><td class="text-center px-4 py-2 font-bold" style="color:#1e293b;">${s.score}</td><td class="text-center px-4 py-2"><span class="px-2 py-0.5 rounded text-xs font-semibold" style="background:#f1f5f9;color:#1e293b;">${s.grade}</span></td><td class="text-center px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold" style="background:${resultBg(s.result)};color:${resultColor(s.result)};">${s.result}</span></td><td class="px-4 py-2 text-xs" style="color:#64748b;">${s.comment || '—'}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                const overlay = document.getElementById('view-report-overlay');
+                overlay.classList.remove('hidden');
+                lucide.createIcons({ nodes: [overlay] });
+            } catch (error) {
+                showToast('Failed to load report: ' + error.message, 'error');
+            }
+        }
+
+        function closeViewReportModal() {
+            document.getElementById('view-report-overlay').classList.add('hidden');
+        }
+
+        function downloadReport(reportId) {
+            window.open(`${API_BASE}/api/reports/download/${reportId}`, '_blank');
+        }
+
+        async function downloadSelectedReports() {
+            const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => cb.dataset.reportId);
+            if (selectedIds.length === 0) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/reports/download-batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                    body: JSON.stringify({ report_ids: selectedIds })
+                });
+                
+                if (!response.ok) throw new Error('Download failed');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `reports_batch_${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showToast('Download started!', 'success');
+            } catch (error) {
+                showToast('Failed to download: ' + error.message, 'error');
+            }
+        }
+
+        async function downloadClassReports(className) {
+            const term = document.getElementById('filter-term').value;
+            const year = new Date().getFullYear() + '/' + (new Date().getFullYear() + 1);
+            
+            if (!term) {
+                showToast('Please select a term filter first', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/reports/download-class`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                    body: JSON.stringify({ student_class: className, term: term, academic_year: year })
+                });
+                
+                if (!response.ok) throw new Error('Download failed');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${className}_${term}_${year}_Reports.zip`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showToast('Class download started!', 'success');
+            } catch (error) {
+                showToast('Failed to download: ' + error.message, 'error');
+            }
+        }
+
+        async function assignPosition(reportId) {
+            const report = allReports.find(r => r.id === reportId);
+            if (!report || !['FORM 1', 'FORM 2'].includes(report.student_class)) {
+                showToast('Only FORM 1 and FORM 2 can have positions assigned', 'warning');
+                return;
+            }
+
+            if (!confirm(`Assign/update positions for all ${report.student_class} students?`)) return;
+
+            try {
+                await apiRequest('/api/reports/assign-positions', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        student_class: report.student_class,
+                        term: report.term,
+                        academic_year: report.academic_year
+                    })
+                });
+                showToast('Positions assigned successfully!', 'success');
+                loadReports();
+            } catch (error) {
+                showToast('Failed to assign positions: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteReport(reportId) {
+            if (!confirm('Delete this report permanently?')) return;
+            try {
+                await apiRequest(`/api/reports/${reportId}`, { method: 'DELETE' });
+                showToast('Report deleted', 'warning');
+                loadReports();
+            } catch (error) {
+                showToast('Failed to delete: ' + error.message, 'error');
+            }
+        }
+
+        function toggleClassSelection(folderId, checked) {
+            const checkboxes = document.querySelectorAll(`#${folderId} .report-checkbox`);
+            checkboxes.forEach(cb => cb.checked = checked);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.report-checkbox:checked').length;
+            document.getElementById('selected-count').textContent = count;
+            document.getElementById('btn-download-selected').disabled = count === 0;
+        }
+
+        let searchTimeout;
+        function debouncedSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadReports, 300);
+        }
+
 
         document.getElementById('filter-reg-class').addEventListener('change', (e) => {
             currentRegFilter = e.target.value;
