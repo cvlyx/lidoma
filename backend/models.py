@@ -66,3 +66,22 @@ class SchoolAsset(Base):
     data_url: Mapped[str] = mapped_column(Text())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+
+class SchoolReport(Base):
+    __tablename__ = "school_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(32), ForeignKey("students.student_id", ondelete="CASCADE"), index=True)
+    student_name: Mapped[str] = mapped_column(String(120), index=True)
+    student_class: Mapped[str] = mapped_column(String(32), index=True)
+    term: Mapped[str] = mapped_column(String(32), index=True)
+    academic_year: Mapped[str] = mapped_column(String(32), index=True)
+    total_subjects: Mapped[int] = mapped_column(Integer)
+    average_score: Mapped[float] = mapped_column(Integer)  # For FORM 1&2 position calculation
+    aggregate_points: Mapped[float] = mapped_column(Integer)  # For FORM 3&4
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Position in class (FORM 1&2 only)
+    report_data: Mapped[str] = mapped_column(Text())  # JSON string with full report details
+    pdf_data: Mapped[str | None] = mapped_column(Text(), nullable=True)  # Base64 encoded PDF
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
