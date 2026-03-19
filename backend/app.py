@@ -125,6 +125,29 @@ class SettingsOut(BaseModel):
     report_title: str | None = None
 
 
+class ReportGenerateIn(BaseModel):
+    student_class: str = Field(..., min_length=1, max_length=32)
+    term: str = Field(..., min_length=1, max_length=32)
+    academic_year: str = Field(..., min_length=4, max_length=32)
+    assign_positions: bool = Field(default=False)
+
+
+class ReportAssignPositionsIn(BaseModel):
+    student_class: str = Field(..., min_length=1, max_length=32)
+    term: str = Field(..., min_length=1, max_length=32)
+    academic_year: str = Field(..., min_length=4, max_length=32)
+
+
+class ReportDownloadBatchIn(BaseModel):
+    report_ids: list[int] = Field(default_factory=list)
+
+
+class ReportDownloadClassIn(BaseModel):
+    student_class: str = Field(..., min_length=1, max_length=32)
+    term: str = Field(..., min_length=1, max_length=32)
+    academic_year: str = Field(..., min_length=4, max_length=32)
+
+
 class LogoIn(BaseModel):
     data_url: str = Field(..., min_length=20)
 
@@ -641,18 +664,15 @@ def delete_report(
 
 @app.post("/api/reports/generate")
 def generate_reports(
-    payload: dict,
+    payload: ReportGenerateIn,
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
     """Generate and save reports for students in a class"""
-    student_class = payload.get("student_class")
-    term = payload.get("term")
-    academic_year = payload.get("academic_year")
-    assign_positions = payload.get("assign_positions", False)  # For FORM 1&2
-    
-    if not student_class or not term or not academic_year:
-        raise HTTPException(status_code=400, detail="Missing required fields")
+    student_class = payload.student_class
+    term = payload.term
+    academic_year = payload.academic_year
+    assign_positions = payload.assign_positions
     
     # Get all students in the class
     students = db.scalars(select(Student).where(Student.student_class == student_class)).all()
@@ -767,14 +787,14 @@ def generate_reports(
 
 @app.post("/api/reports/assign-positions")
 def assign_positions_endpoint(
-    payload: dict,
+    payload: ReportAssignPositionsIn,
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ):
     """Assign positions to FORM 1&2 students based on average scores"""
-    student_class = payload.get("student_class")
-    term = payload.get("term")
-    academic_year = payload.get("academic_year")
+    student_class = payload.student_class
+    term = payload.term
+    academic_year = payload.academic_year
     
     if not student_class or student_class not in ['FORM 1', 'FORM 2']:
         raise HTTPException(status_code=400, detail="Only FORM 1 and FORM 2 can have positions assigned")
@@ -966,7 +986,7 @@ def download_report_pdf(
 
 @app.post("/api/reports/download-batch")
 def download_batch_reports(
-    payload: dict,
+    payload: ReportDownloadBatchIn,
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -977,7 +997,7 @@ def download_batch_reports(
     import zipfile
     from fastapi.responses import StreamingResponse
     
-    report_ids = payload.get("report_ids", [])
+    report_ids = payload.report_ids
     if not report_ids:
         raise HTTPException(status_code=400, detail="No report IDs provided")
     
@@ -1029,7 +1049,7 @@ def download_batch_reports(
 
 @app.post("/api/reports/download-class")
 def download_class_reports(
-    payload: dict,
+    payload: ReportDownloadClassIn,
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -1040,12 +1060,9 @@ def download_class_reports(
     import zipfile
     from fastapi.responses import StreamingResponse
     
-    student_class = payload.get("student_class")
-    term = payload.get("term")
-    academic_year = payload.get("academic_year")
-    
-    if not student_class or not term or not academic_year:
-        raise HTTPException(status_code=400, detail="Missing required fields")
+    student_class = payload.student_class
+    term = payload.term
+    academic_year = payload.academic_year
     
     # Get all reports for the class
     reports = db.scalars(
