@@ -2303,7 +2303,7 @@
                 btn.style.color = primary;
                 btn.style.borderColor = primary;
                 
-                ['students', 'entry', 'report', 'analytics', 'settings'].forEach(t => {
+                ['students', 'entry', 'report', 'analytics', 'reports-archive', 'settings'].forEach(t => {
                     const el = document.getElementById('tab-' + t);
                     if (el) {
                         if (t === tab) { 
@@ -2328,6 +2328,13 @@
                         buildAnalytics();
                     } catch (e) {
                         console.error('Error building analytics:', e);
+                    }
+                }
+                if (tab === 'reports-archive') {
+                    try {
+                        loadReports();
+                    } catch (e) {
+                        console.error('Error loading reports:', e);
                     }
                 }
             });
