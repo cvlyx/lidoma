@@ -2051,8 +2051,8 @@
                         topRows += `<div class="flex items-center justify-between py-2" style="border-bottom:1px solid #f1f5f9;">
               <span class="text-sm" style="color:#1e293b;">${medal} ${s.name}</span>
               <div class="flex items-center gap-2">
-                <span class="text-sm font-bold" style="color:#059669;">${s.avg.toFixed(1)}%</span>
-                <span class="text-xs px-2 py-0.5 rounded-full" style="background:#ecfdf5;color:#059669;">TOP</span>
+                <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${s.avg.toFixed(1)}%</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
               </div>
             </div>`;
                     });
