@@ -80,6 +80,11 @@ class StudentIn(BaseModel):
     student_class: str = Field(..., min_length=1, max_length=32)
 
 
+class StudentUpdateIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    student_class: str = Field(..., min_length=1, max_length=32)
+
+
 class StudentOut(StudentIn):
     created_at: datetime
 
@@ -92,6 +97,14 @@ class RecordIn(BaseModel):
     academic_year: str = Field(..., min_length=4, max_length=32)
     subject: str = Field(..., min_length=1, max_length=64)
     score: int = Field(..., ge=0, le=100)
+    teacher_comment: str | None = Field(default=None, max_length=240)
+
+
+class RecordUpdateIn(BaseModel):
+    term: str | None = Field(default=None, min_length=1, max_length=32)
+    academic_year: str | None = Field(default=None, min_length=4, max_length=32)
+    subject: str | None = Field(default=None, min_length=1, max_length=64)
+    score: int | None = Field(default=None, ge=0, le=100)
     teacher_comment: str | None = Field(default=None, max_length=240)
 
 
@@ -305,6 +318,24 @@ def delete_student(
     return Response(status_code=204)
 
 
+@app.put("/api/students/{student_id}", response_model=StudentOut)
+def update_student(
+    payload: StudentUpdateIn,
+    student_id: str,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    s = db.scalar(select(Student).where(Student.student_id == student_id))
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    s.name = payload.name
+    s.student_class = payload.student_class
+    db.commit()
+    db.refresh(s)
+    return StudentOut(student_id=s.student_id, name=s.name, student_class=s.student_class, created_at=s.created_at)
+
+
 @app.get("/api/records", response_model=list[RecordOut])
 def list_records(
     user: Annotated[User, Depends(get_current_user)],
@@ -383,6 +414,44 @@ def delete_record(
         raise HTTPException(status_code=404, detail="Record not found")
     db.commit()
     return Response(status_code=204)
+
+
+@app.put("/api/records/{record_id}", response_model=RecordOut)
+def update_record(
+    payload: RecordUpdateIn,
+    record_id: int,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    r = db.scalar(select(GradeRecord).where(GradeRecord.id == record_id))
+    if not r:
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    if payload.term is not None:
+        r.term = payload.term
+    if payload.academic_year is not None:
+        r.academic_year = payload.academic_year
+    if payload.subject is not None:
+        r.subject = payload.subject
+    if payload.score is not None:
+        r.score = payload.score
+    if payload.teacher_comment is not None:
+        r.teacher_comment = payload.teacher_comment
+    
+    db.commit()
+    db.refresh(r)
+    return RecordOut(
+        id=r.id,
+        student_id=r.student_id,
+        student_name=r.student_name,
+        student_class=r.student_class,
+        term=r.term,
+        academic_year=r.academic_year,
+        subject=r.subject,
+        score=r.score,
+        teacher_comment=r.teacher_comment,
+        created_at=r.created_at,
+    )
 
 
 @app.delete("/api/records/clear", status_code=204)
