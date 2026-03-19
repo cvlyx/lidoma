@@ -117,6 +117,21 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
         }
 
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         input:focus,
         select:focus {
             outline: none;
@@ -1106,6 +1121,10 @@
 
                 async function handleLogin() {
                     authErr.classList.add('hidden');
+                    // Show loading state
+                    authBtn.disabled = true;
+                    const originalText = authBtn.innerHTML;
+                    authBtn.innerHTML = '<span class="spinner"></span> Logging in...';
                     try {
                         await login(userInp.value.trim(), passInp.value);
                         // After login, load fresh data
@@ -1118,6 +1137,10 @@
                     } catch (e) {
                         authErr.textContent = e.message || 'Login failed';
                         authErr.classList.remove('hidden');
+                    } finally {
+                        // Reset button state
+                        authBtn.disabled = false;
+                        authBtn.innerHTML = originalText;
                     }
                 }
 
