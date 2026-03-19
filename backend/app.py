@@ -24,9 +24,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 app = FastAPI(title="LIDOMA API", version="0.1.0")
 
+# Configure CORS origins.
+# - `ALLOWED_ORIGINS` can be set in the environment (comma-separated list).
+# - For Vercel deployments we allow any vercel.app preview URL via regex.
+allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+
+# Keep common local defaults when no origins are explicitly configured.
+if not allowed_origins:
+    allowed_origins = ["http://127.0.0.1:8787", "http://localhost:8787"]
+
+# Allow Vercel preview URLs (e.g. https://<project>-<hash>.vercel.app)
+allow_origin_regex = r"^https?://([a-z0-9-]+\.)*vercel\.app$"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
+    allow_origins=allowed_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
