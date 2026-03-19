@@ -138,6 +138,44 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }
 
+        /* Mobile / responsive improvements */
+        @media (max-width: 768px) {
+            #app-header .max-w-6xl {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            nav > div {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .tab-btn {
+                flex: 1 1 45%;
+                min-width: 140px;
+                justify-content: center;
+            }
+
+            .tab-btn span {
+                justify-content: center;
+            }
+
+            .a4-page {
+                width: 100%;
+                padding: 12mm;
+            }
+
+            .max-w-6xl {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .overflow-x-auto {
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
         .a4-page {
             width: 210mm;
             min-height: 297mm;
