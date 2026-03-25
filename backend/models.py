@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -69,6 +69,7 @@ class SchoolAsset(Base):
 
 class SchoolReport(Base):
     __tablename__ = "school_reports"
+    __table_args__ = (UniqueConstraint("student_id", "term", "academic_year", name="uq_report_student_term_year"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     student_id: Mapped[str] = mapped_column(String(32), ForeignKey("students.student_id", ondelete="CASCADE"), index=True)
@@ -77,8 +78,8 @@ class SchoolReport(Base):
     term: Mapped[str] = mapped_column(String(32), index=True)
     academic_year: Mapped[str] = mapped_column(String(32), index=True)
     total_subjects: Mapped[int] = mapped_column(Integer)
-    average_score: Mapped[float] = mapped_column(Integer)  # For FORM 1&2 position calculation
-    aggregate_points: Mapped[float] = mapped_column(Integer)  # For FORM 3&4
+    average_score: Mapped[float] = mapped_column(Float)
+    aggregate_points: Mapped[float] = mapped_column(Float)
     position: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Position in class (FORM 1&2 only)
     report_data: Mapped[str] = mapped_column(Text())  # JSON string with full report details
     pdf_data: Mapped[str | None] = mapped_column(Text(), nullable=True)  # Base64 encoded PDF

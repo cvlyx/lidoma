@@ -27,6 +27,7 @@
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
         rel="stylesheet">
@@ -596,14 +597,6 @@
                         </span>
                     </h2>
                     <div class="flex items-center gap-3">
-                        <button onclick="openGenerateReportModal()" 
-                            class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
-                            style="background:#4f46e5;color:#ffffff;">
-                            <span class="flex items-center gap-2">
-                                <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
-                                Generate Reports
-                            </span>
-                        </button>
                         <button onclick="downloadSelectedReports()" id="btn-download-selected" disabled
                             class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
                             style="background:#059669;color:#ffffff;">
@@ -955,10 +948,17 @@
                             <p class="text-xs" style="color:#64748b;">Student performance summary</p>
                         </div>
                     </div>
-                    <button onclick="closeViewReportModal()" 
-                        class="rounded-lg p-2 transition-colors hover:bg-slate-100">
-                        <i data-lucide="x" style="width:20px;height:20px;color:#64748b;"></i>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button onclick="closeViewReportModal()" 
+                            class="rounded-lg p-2 transition-colors hover:bg-slate-100">
+                            <i data-lucide="x" style="width:20px;height:20px;color:#64748b;"></i>
+                        </button>
+                        <button id="btn-download-viewed-report"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#1e293b;color:#fff;">
+                            <i data-lucide="download" style="width:16px;height:16px;"></i> Download PDF
+                        </button>
+                    </div>
                 </div>
                 <div id="view-report-content" class="space-y-4">
                     <!-- Content will be populated dynamically -->
@@ -1035,7 +1035,7 @@
         const LOGO_KEY = 'lidoma_logo_base64';
 
         // ========== BACKEND API / AUTH ==========
-        const API_BASE = 'https://lidoma.onrender.com';
+        const API_BASE = 'http://localhost:8000';
         const TOKEN_KEY = 'lidoma_jwt';
 
         function getToken() {
@@ -1926,7 +1926,10 @@
         function createReportRow(report) {
             const pos = report.position ? `#${report.position}` : '<span class="text-slate-400">-</span>';
             const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(report.student_class);
-            
+            const subjectsDisplay = report.total_subjects > 0
+                ? `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f0fdf4;color:#059669;">${report.total_subjects}</span>`
+                : `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#fef2f2;color:#dc2626;">No grades</span>`;
+
             return `
                 <tr style="border-top:1px solid #f1f5f9;" class="hover:bg-slate-50/50">
                     <td class="px-4 py-3"><input type="checkbox" class="report-checkbox" data-report-id="${report.id}" onchange="updateSelectedCount()"></td>
@@ -1934,6 +1937,7 @@
                     <td class="px-4 py-3 font-medium" style="color:#1e293b;">${report.student_name}</td>
                     <td class="px-4 py-3 font-mono text-xs" style="color:#64748b;">${report.student_id}</td>
                     <td class="text-center px-4 py-3 text-xs" style="color:#64748b;">${report.term}</td>
+                    <td class="text-center px-4 py-3">${subjectsDisplay}</td>
                     <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#eff6ff;color:#2563eb;">${report.average_score.toFixed(1)}%</span></td>
                     <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f5f3ff;color:#7c3aed;">${report.aggregate_points.toFixed(1)}</span></td>
                     <td class="text-center px-4 py-3">
@@ -2005,6 +2009,7 @@
 
                 await apiRequest('/api/reports/generate', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         student_class: studentClass,
                         term: term,
@@ -2028,35 +2033,155 @@
 
         document.getElementById('btn-cancel-generate').addEventListener('click', closeGenerateReportModal);
 
+        function buildReportCardHTML(report) {
+            const d = report.report_data;
+            const isForm1Or2 = d.is_form1_or_2;
+            const logoDataUrl = localStorage.getItem('lidoma_logo_base64') || '';
+            const subjects = d.subjects || [];
+            const sn = d.school_name || 'LIDOMA PRIVATE SECONDARY SCHOOL';
+            const ay = report.academic_year;
+
+            const autoComment = (res) => {
+                if (res === 'DIST') return 'Outstanding Performance';
+                if (res === 'STRONG CREDIT') return 'Excellent Achievement';
+                if (res === 'CRED') return 'Very Good Progress';
+                if (res === 'PASS') return 'Satisfactory; Needs Focus';
+                return 'Requires Urgent Attention';
+            };
+
+            const rows = subjects.map((s, i) => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td class="px-3 py-2 text-[11px] text-center border-r border-slate-100 font-medium">${i + 1}</td>
+                    <td class="px-3 py-2 text-[11px] font-bold border-r border-slate-100 uppercase text-slate-700">${s.subject}</td>
+                    <td class="text-center px-3 py-2 text-[12px] font-black border-r border-slate-100 text-indigo-900 bg-slate-50/50">${s.score}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-bold">${s.grade}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-black uppercase" style="color:${resultColor(s.result)}">${s.result}</td>
+                    <td class="px-3 py-2 text-[10px] italic font-medium" style="color:#64748b;">${s.comment || autoComment(s.result)}</td>
+                </tr>`).join('');
+
+            let aggregate;
+            if (isForm1Or2) {
+                const avgAll = subjects.reduce((a, b) => a + b.score, 0) / (subjects.length || 1);
+                aggregate = 'GRADE ' + calcGrade(Math.round(avgAll), 'FORM 1').grade;
+            } else {
+                aggregate = d.aggregate || report.aggregate_points || 0;
+            }
+
+            const isDataURL = logoDataUrl.startsWith('data:');
+            const logoHTML = isDataURL
+                ? `<img src="${logoDataUrl}" alt="Logo" class="h-20 w-20 object-contain drop-shadow-sm" onerror="this.style.display='none'">`
+                : `<div class="h-20 w-20 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-[9px] text-center font-bold uppercase p-2 text-slate-400">School Logo</div>`;
+
+            return `
+                <div id="report-card-print" class="flex flex-col h-full text-slate-900" style="font-family:'DM Sans',sans-serif;font-size:13px;">
+                    <div class="flex items-center gap-6 border-b-2 border-indigo-600 pb-5 mb-5">
+                        ${logoHTML}
+                        <div class="flex-1 text-left">
+                            <h1 class="font-display text-2xl font-black uppercase tracking-tight leading-none mb-1" style="color:#1e1b4b;">${sn}</h1>
+                            <div class="flex items-center gap-3 mb-2">
+                                <h2 class="text-base font-black text-indigo-600 uppercase tracking-[0.1em]">PROGRESS REPORT CARD</h2>
+                                <span class="h-px flex-1 bg-slate-200"></span>
+                            </div>
+                            <div class="flex gap-6 text-[11px] font-black text-slate-500 uppercase">
+                                <span>YEAR: <span class="text-indigo-900 border-b-2 border-indigo-100">${ay}</span></span>
+                                <span>TERM: <span class="text-indigo-900 border-b-2 border-indigo-100">${report.term.toUpperCase()}</span></span>
+                                <span>CLASS: <span class="text-indigo-900 border-b-2 border-indigo-100">${report.student_class.toUpperCase()}</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-5 flex items-center justify-between bg-slate-50 border-y border-slate-200 py-3 px-4 rounded-sm">
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student Name:</span>
+                            <span class="text-xl font-black text-slate-900 uppercase tracking-tight">${report.student_name}</span>
+                        </div>
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student ID:</span>
+                            <span class="text-base font-mono font-black text-indigo-700 bg-white px-3 py-0.5 border border-indigo-100 rounded-full shadow-sm">${report.student_id}</span>
+                        </div>
+                    </div>
+                    <div class="border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900 text-white">
+                                    <th class="px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-12">No#</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700">SUBJECT</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-20">SCORE (%)</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-16">GRADE</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-32">RESULT</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase">TEACHER'S COMMENT</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">${rows}</tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between border-2 border-indigo-100 p-4 bg-indigo-50/30 rounded-lg shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-md">
+                                <i data-lucide="award" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-black text-indigo-900 uppercase tracking-widest block">${isForm1Or2 ? 'OVERALL GRADE' : 'AGGREGATE FOR BEST 6 SUBJECTS'}</span>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase leading-none">Official performance metric</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white px-6 py-2 rounded-full border-2 border-indigo-200 shadow-inner">
+                            <span class="text-2xl font-black text-indigo-700">${aggregate}</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${isForm1Or2 ? 'GRADE' : 'POINTS'}</span>
+                        </div>
+                    </div>
+                    <div class="mt-auto pt-6">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">OFFICIAL GRADING SCALE</span>
+                            <span class="h-px flex-1 bg-slate-100"></span>
+                        </div>
+                        <table class="w-full border-collapse border border-slate-200 text-[9px] rounded-lg overflow-hidden shadow-sm">
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase w-20 text-slate-500">GRADE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">1</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">2</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">3</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">4</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">5</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">6</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">7</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">8</td>
+                                <td class="p-1.5 text-center font-bold text-red-600 bg-red-50/30">9</td>
+                            </tr>
+                            <tr class="text-slate-500 font-medium">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase text-slate-400">RANGE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">90-100</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">80-89</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">70-79</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">66-69</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">60-65</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">50-59</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">46-49</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">40-45</td>
+                                <td class="p-1.5 text-center bg-red-50/30">0-39</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="mt-6 border-t-2 border-slate-100 pt-4 flex justify-between items-end">
+                        <div class="text-left">
+                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-widest leading-none mb-1">Next Term Resumption:</p>
+                            <p class="text-sm font-black text-slate-900 uppercase">5th JANUARY, 2026</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-slate-400 italic">This is an electronically generated official report card of ${sn}.</p>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+
         async function viewReport(reportId) {
             try {
                 const report = await apiRequest(`/api/reports/${reportId}`);
                 const content = document.getElementById('view-report-content');
-                
-                content.innerHTML = `
-                    <div class="grid grid-cols-2 gap-4 p-4 rounded-lg" style="background:#f8fafc;">
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Student Name</p><p class="text-sm font-bold" style="color:#1e293b;">${report.student_name}</p></div>
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Student ID</p><p class="text-sm font-mono" style="color:#64748b;">${report.student_id}</p></div>
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Class</p><p class="text-sm" style="color:#1e293b;">${report.student_class}</p></div>
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Term & Year</p><p class="text-sm" style="color:#1e293b;">${report.term} ${report.academic_year}</p></div>
-                        ${report.position ? `<div><p class="text-xs font-semibold" style="color:#64748b;">Position</p><p class="text-lg font-black" style="color:#4f46e5;">#${report.position}</p></div>` : ''}
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Average Score</p><p class="text-lg font-black" style="color:#2563eb;">${report.average_score.toFixed(1)}%</p></div>
-                        <div><p class="text-xs font-semibold" style="color:#64748b;">Total Subjects</p><p class="text-sm" style="color:#1e293b;">${report.total_subjects}</p></div>
-                    </div>
-                    <h4 class="font-bold mt-4" style="color:#1e293b;">Subject Breakdown</h4>
-                    <div class="border rounded-lg overflow-hidden">
-                        <table class="w-full text-sm">
-                            <thead style="background:#1e293b;"><tr class="text-white"><th class="text-left px-4 py-2">Subject</th><th class="text-center px-4 py-2">Score</th><th class="text-center px-4 py-2">Grade</th><th class="text-center px-4 py-2">Result</th><th class="text-left px-4 py-2">Comment</th></tr></thead>
-                            <tbody>
-                                ${report.report_data.subjects.map(s => `<tr style="border-bottom:1px solid #f1f5f9;"><td class="px-4 py-2 font-medium" style="color:#1e293b;">${s.subject}</td><td class="text-center px-4 py-2 font-bold" style="color:#1e293b;">${s.score}</td><td class="text-center px-4 py-2"><span class="px-2 py-0.5 rounded text-xs font-semibold" style="background:#f1f5f9;color:#1e293b;">${s.grade}</span></td><td class="text-center px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold" style="background:${resultBg(s.result)};color:${resultColor(s.result)};">${s.result}</span></td><td class="px-4 py-2 text-xs" style="color:#64748b;">${s.comment || '—'}</td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-                
+                content.innerHTML = buildReportCardHTML(report);
                 const overlay = document.getElementById('view-report-overlay');
                 overlay.classList.remove('hidden');
-                lucide.createIcons({ nodes: [overlay] });
+                document.getElementById('btn-download-viewed-report').onclick = () => downloadReport(reportId);
             } catch (error) {
                 showToast('Failed to load report: ' + error.message, 'error');
             }
@@ -2066,30 +2191,60 @@
             document.getElementById('view-report-overlay').classList.add('hidden');
         }
 
-        function downloadReport(reportId) {
-            window.open(`${API_BASE}/api/reports/download/${reportId}`, '_blank');
+        async function downloadReport(reportId) {
+            try {
+                const report = await apiRequest(`/api/reports/${reportId}`);
+                const blob = await generateReportPdfBlob(report);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${report.student_name}_${report.term}_${report.academic_year}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                showToast('Failed to download: ' + error.message, 'error');
+            }
+        }
+
+        async function generateReportPdfBlob(report) {
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;padding:32px;';
+            container.innerHTML = buildReportCardHTML(report);
+            document.body.appendChild(container);
+            try {
+                const blob = await html2pdf().set({
+                    margin: 10,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(container.firstElementChild).outputPdf('blob');
+                return blob;
+            } finally {
+                document.body.removeChild(container);
+            }
         }
 
         async function downloadSelectedReports() {
-            const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => cb.dataset.reportId);
+            const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => parseInt(cb.dataset.reportId));
             if (selectedIds.length === 0) return;
-            
+
+            showToast(`Generating ${selectedIds.length} PDF(s)...`, 'success');
             try {
-                const response = await fetch(`${API_BASE}/api/reports/download-batch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-                    body: JSON.stringify({ report_ids: selectedIds })
-                });
-                
-                if (!response.ok) throw new Error('Download failed');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
+                const zip = new JSZip();
+                for (const id of selectedIds) {
+                    const report = await apiRequest(`/api/reports/${id}`);
+                    const blob = await generateReportPdfBlob(report);
+                    const pos = report.position ? `${report.position}_` : '';
+                    zip.file(`${pos}${report.student_name}_${report.term}_${report.academic_year}.pdf`, blob);
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(zipBlob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `reports_batch_${new Date().toISOString().split('T')[0]}.zip`;
                 a.click();
-                window.URL.revokeObjectURL(url);
-                showToast('Download started!', 'success');
+                URL.revokeObjectURL(url);
+                showToast('Download ready!', 'success');
             } catch (error) {
                 showToast('Failed to download: ' + error.message, 'error');
             }
@@ -2097,29 +2252,28 @@
 
         async function downloadClassReports(className) {
             const term = document.getElementById('filter-term').value;
-            const year = new Date().getFullYear() + '/' + (new Date().getFullYear() + 1);
-            
-            if (!term) {
-                showToast('Please select a term filter first', 'warning');
-                return;
-            }
-            
+            if (!term) { showToast('Please select a term filter first', 'warning'); return; }
+
+            const classReports = allReports.filter(r => r.student_class === className && r.term === term);
+            if (classReports.length === 0) { showToast('No reports found for this class/term', 'warning'); return; }
+
+            showToast(`Generating ${classReports.length} PDF(s)...`, 'success');
             try {
-                const response = await fetch(`${API_BASE}/api/reports/download-class`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-                    body: JSON.stringify({ student_class: className, term: term, academic_year: year })
-                });
-                
-                if (!response.ok) throw new Error('Download failed');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
+                const zip = new JSZip();
+                for (const summary of classReports) {
+                    const report = await apiRequest(`/api/reports/${summary.id}`);
+                    const blob = await generateReportPdfBlob(report);
+                    const pos = report.position ? `${report.position}_` : '';
+                    zip.file(`${pos}${report.student_name}_${report.term}_${report.academic_year}.pdf`, blob);
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(zipBlob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${className}_${term}_${year}_Reports.zip`;
+                a.download = `${className}_${term}_Reports.zip`;
                 a.click();
-                window.URL.revokeObjectURL(url);
-                showToast('Class download started!', 'success');
+                URL.revokeObjectURL(url);
+                showToast('Download ready!', 'success');
             } catch (error) {
                 showToast('Failed to download: ' + error.message, 'error');
             }
@@ -2137,6 +2291,7 @@
             try {
                 await apiRequest('/api/reports/assign-positions', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         student_class: report.student_class,
                         term: report.term,
@@ -2896,144 +3051,158 @@
         function buildAnalytics() {
             const c = document.getElementById('analytics-content');
             const cAlt = document.getElementById('analytics-content-alt');
-            
-            const analyticRecords = currentFilter === 'all' 
-                ? allRecords 
+
+            const analyticRecords = currentFilter === 'all'
+                ? allRecords
                 : allRecords.filter(r => r.student_id === currentFilter);
 
             if (analyticRecords.length === 0) {
-                const emptyMsg = '<p class="text-center text-sm py-12" style="color:#94a3b8;">Enter grades to see analytics.</p>';
+                const emptyMsg = `<div class="flex flex-col items-center justify-center py-20 gap-3">
+                    <i data-lucide="bar-chart-2" style="width:48px;height:48px;color:#cbd5e1;"></i>
+                    <p class="text-sm font-medium" style="color:#94a3b8;">Enter grades to see analytics.</p>
+                </div>`;
                 if (c) c.innerHTML = emptyMsg;
-                if (cAlt) cAlt.innerHTML = emptyMsg;
+                if (cAlt) { cAlt.innerHTML = emptyMsg; lucide.createIcons({ nodes: [cAlt] }); }
                 return;
             }
 
             const scores = analyticRecords.map(r => r.score);
             const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
             const maxScore = Math.max(...scores);
+            const minScore = Math.min(...scores);
+            const passing = scores.filter(s => s >= 40).length;
+            const passRate = ((passing / scores.length) * 100).toFixed(0);
 
-            // Grade distribution
-            const dist = { 'Distinction': 0, 'Credit': 0, 'Pass': 0, 'Weak Pass': 0, 'Fail': 0 };
-            analyticRecords.forEach(r => { dist[calcGrade(r.score, r.student_class).result]++; });
+            const dist = {};
+            analyticRecords.forEach(r => {
+                const res = calcGrade(r.score, r.student_class).result;
+                dist[res] = (dist[res] || 0) + 1;
+            });
 
-            // Bar chart
+            const statCards = `
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                    <div class="rounded-xl p-4" style="background:#f0f9ff;border:1px solid #bae6fd;">
+                        <p class="text-[11px] font-bold uppercase tracking-wider mb-1" style="color:#0369a1;">Average Score</p>
+                        <p class="text-2xl font-black" style="color:#0c4a6e;">${avg.toFixed(1)}%</p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                        <p class="text-[11px] font-bold uppercase tracking-wider mb-1" style="color:#15803d;">Highest Score</p>
+                        <p class="text-2xl font-black" style="color:#14532d;">${maxScore}%</p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background:#fef2f2;border:1px solid #fecaca;">
+                        <p class="text-[11px] font-bold uppercase tracking-wider mb-1" style="color:#dc2626;">Lowest Score</p>
+                        <p class="text-2xl font-black" style="color:#7f1d1d;">${minScore}%</p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background:#faf5ff;border:1px solid #e9d5ff;">
+                        <p class="text-[11px] font-bold uppercase tracking-wider mb-1" style="color:#7c3aed;">Pass Rate</p>
+                        <p class="text-2xl font-black" style="color:#4c1d95;">${passRate}%</p>
+                    </div>
+                </div>`;
+
             const bars = analyticRecords.map((r, i) => {
-                const pct = (r.score / 100) * 100;
                 const g = calcGrade(r.score, r.student_class);
-                return `<div class="flex flex-col items-center gap-1" style="flex:1;min-width:40px;max-width:80px;">
-      <span class="text-xs font-semibold" style="color:#1e293b;">${r.score}</span>
-      <div class="w-full rounded-t-md bar-animate" style="height:${Math.max(pct * 1.8, 8)}px;background:${resultColor(g.result)};animation-delay:${i * 0.08}s;"></div>
-      <span class="text-xs text-center truncate w-full" style="color:#64748b;" title="${r.subject}">${r.subject.length > 6 ? r.subject.slice(0, 6) + '…' : r.subject}</span>
-    </div>`;
+                const label = r.subject.length > 8 ? r.subject.slice(0, 8) + '\u2026' : r.subject;
+                return `<div class="flex flex-col items-center gap-1" style="min-width:52px;flex:1;">
+                    <span class="text-xs font-bold" style="color:#1e293b;">${r.score}</span>
+                    <div class="w-full rounded-t-lg bar-animate" style="height:${Math.max(r.score * 1.6, 6)}px;background:${resultColor(g.result)};animation-delay:${i * 0.06}s;"></div>
+                    <span class="text-[10px] text-center w-full truncate" style="color:#64748b;" title="${r.subject}">${label}</span>
+                </div>`;
             }).join('');
 
-            // Distribution pills
-            const pills = Object.entries(dist).map(([k, v]) => {
-                if (v === 0) return '';
-                return `<div class="flex items-center gap-2 rounded-full px-3 py-1.5" style="background:${resultBg(k)};border:1px solid ${resultColor(k)}30;">
-      <span class="w-2.5 h-2.5 rounded-full" style="background:${resultColor(k)};"></span>
-      <span class="text-xs font-semibold" style="color:${resultColor(k)};">${k}: ${v}</span>
-    </div>`;
-            }).join('');
+            const pills = Object.entries(dist).map(([k, v]) => `
+                <div class="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold" style="background:${resultBg(k)};border:1px solid ${resultColor(k)}40;color:${resultColor(k)};">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${resultColor(k)};"></span>
+                    ${k}: ${v}
+                </div>`).join('');
 
-            // Top performers/subjects
-            let topRows;
+            let topRows = '';
             if (currentFilter === 'all') {
                 const studentMap = new Map();
                 analyticRecords.forEach(r => {
-                    if (!studentMap.has(r.student_id)) {
-                        studentMap.set(r.student_id, { name: r.student_name, class: r.student_class, scores: [], total: 0, count: 0 });
-                    }
+                    if (!studentMap.has(r.student_id)) studentMap.set(r.student_id, { name: r.student_name, class: r.student_class, total: 0, count: 0 });
                     const s = studentMap.get(r.student_id);
-                    s.scores.push(r.score);
-                    s.total += r.score;
-                    s.count += 1;
+                    s.total += r.score; s.count++;
                 });
-                const students = Array.from(studentMap.values()).map(s => ({ ...s, avg: s.total / s.count }));
-                students.sort((a, b) => b.avg - a.avg);
+                const allStudents = Array.from(studentMap.values()).map(s => ({ ...s, avg: s.total / s.count })).sort((a, b) => b.avg - a.avg);
                 const classGroups = {};
-                students.forEach(s => {
-                    if (!classGroups[s.class]) classGroups[s.class] = [];
-                    classGroups[s.class].push(s);
-                });
-                topRows = '';
+                allStudents.forEach(s => { if (!classGroups[s.class]) classGroups[s.class] = []; classGroups[s.class].push(s); });
                 Object.keys(classGroups).sort().forEach(cls => {
-                    const topInClass = classGroups[cls].slice(0, 5);
-                    topRows += `<div class="mb-4"><h5 class="text-sm font-bold text-slate-700 mb-2">${cls}</h5>`;
-                    topInClass.forEach((s, i) => {
-                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                    topRows += `<div class="mb-3"><p class="text-xs font-black uppercase tracking-wider mb-2 px-2 py-1 rounded" style="color:#4f46e5;background:#eef2ff;">${cls}</p>`;
+                    classGroups[cls].slice(0, 5).forEach((s, i) => {
+                        const medal = i === 0 ? '\ud83e\udd47' : i === 1 ? '\ud83e\udd48' : i === 2 ? '\ud83e\udd49' : `${i+1}.`;
                         const g = calcGrade(s.avg, s.class);
-                        topRows += `<div class="flex items-center justify-between py-2" style="border-bottom:1px solid #f1f5f9;">
-              <span class="text-sm" style="color:#1e293b;">${medal} ${s.name}</span>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${s.avg.toFixed(1)}%</span>
-                <span class="text-xs px-2 py-0.5 rounded-full" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
-              </div>
-            </div>`;
+                        topRows += `<div class="flex items-center justify-between py-2 px-1" style="border-bottom:1px solid #f8fafc;">
+                            <span class="text-sm truncate mr-2" style="color:#1e293b;max-width:60%;">${medal} ${s.name}</span>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${s.avg.toFixed(1)}%</span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
+                            </div>
+                        </div>`;
                     });
                     topRows += '</div>';
                 });
             } else {
-                const sorted = [...analyticRecords].sort((a, b) => b.score - a.score);
-                topRows = sorted.slice(0, 5).map((r, i) => {
+                [...analyticRecords].sort((a, b) => b.score - a.score).slice(0, 8).forEach((r, i) => {
                     const g = calcGrade(r.score, r.student_class);
-                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
-                    return `<div class="flex items-center justify-between py-2" style="border-bottom:1px solid #f1f5f9;">
-              <span class="text-sm" style="color:#1e293b;">${medal} ${r.subject}</span>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${r.score}%</span>
-                <span class="text-xs px-2 py-0.5 rounded-full" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
-              </div>
-            </div>`;
-                }).join('');
+                    const medal = i === 0 ? '\ud83e\udd47' : i === 1 ? '\ud83e\udd48' : i === 2 ? '\ud83e\udd49' : `${i+1}.`;
+                    topRows += `<div class="flex items-center justify-between py-2 px-1" style="border-bottom:1px solid #f8fafc;">
+                        <span class="text-sm truncate mr-2" style="color:#1e293b;max-width:60%;">${medal} ${r.subject}</span>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <span class="text-sm font-bold" style="color:${resultColor(g.result)};">${r.score}%</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.grade}</span>
+                        </div>
+                    </div>`;
+                });
             }
 
-            const content = `
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
-        <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
-          <span class="flex items-center gap-2"><i data-lucide="bar-chart-2" style="width:18px;height:18px;color:#4f46e5;"></i> Score Chart</span>
-        </h3>
-        <div class="flex items-end gap-2 justify-center" style="height:220px;padding-top:20px;">
-          ${bars}
-        </div>
-        <div class="mt-3 flex items-center justify-center gap-1">
-          <div class="h-px flex-1" style="background:#e2e8f0;"></div>
-          <span class="text-xs px-2" style="color:#94a3b8;">Average: ${avg.toFixed(1)}%</span>
-          <div class="h-px flex-1" style="background:#e2e8f0;"></div>
-        </div>
-      </div>
-      <div class="rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
-        <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
-          <span class="flex items-center gap-2"><i data-lucide="pie-chart" style="width:18px;height:18px;color:#4f46e5;"></i> Grade Distribution</span>
-        </h3>
-        <div class="flex flex-wrap gap-2 mb-6">${pills}</div>
-        <h4 class="text-xs font-semibold mb-3" style="color:#64748b;">${currentFilter === 'all' ? 'Top Performers' : 'Top Performing Subjects'}</h4>
-        ${topRows}
-      </div>
-    </div>
-    <div class="mt-6 rounded-xl p-6" style="background:#ffffff;border:1px solid #e2e8f0;">
-      <h3 class="font-display text-base font-bold mb-4" style="color:#1e293b;">
-        <span class="flex items-center gap-2"><i data-lucide="target" style="width:18px;height:18px;color:#4f46e5;"></i> Performance Breakdown</span>
-      </h3>
-      <div class="space-y-3">
-        ${analyticRecords.map(r => {
+            const progressBars = analyticRecords.map(r => {
                 const g = calcGrade(r.score, r.student_class);
-                return `<div>
-            <div class="flex justify-between mb-1">
-              <span class="text-sm" style="color:#1e293b;">${r.subject}</span>
-              <span class="text-xs font-semibold" style="color:${resultColor(g.result)};">${r.score}% — ${g.grade}</span>
-            </div>
-            <div class="w-full rounded-full" style="height:8px;background:#f1f5f9;">
-              <div class="rounded-full" style="width:${r.score}%;height:100%;background:${resultColor(g.result)};transition:width 0.5s ease;"></div>
-            </div>
-          </div>`;
-            }).join('')}
-      </div>
-    </div>
-  `;
-            if (c) c.innerHTML = content;
-            if (cAlt) cAlt.innerHTML = content;
+                const label = r.subject.length > 14 ? r.subject.slice(0,14)+'\u2026' : r.subject;
+                return `<div class="flex items-center gap-3">
+                    <span class="text-sm flex-shrink-0" style="color:#1e293b;width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.subject}">${label}</span>
+                    <div class="flex-1 rounded-full overflow-hidden" style="height:10px;background:#f1f5f9;">
+                        <div class="h-full rounded-full" style="width:${r.score}%;background:${resultColor(g.result)};transition:width 0.6s ease;"></div>
+                    </div>
+                    <span class="text-xs font-bold flex-shrink-0 text-right" style="color:${resultColor(g.result)};width:60px;">${r.score}% ${g.grade}</span>
+                </div>`;
+            }).join('');
+
+            const html = `
+                ${statCards}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <div class="rounded-xl p-5" style="background:#ffffff;border:1px solid #e2e8f0;">
+                        <h3 class="font-display text-sm font-bold mb-4 flex items-center gap-2" style="color:#1e293b;">
+                            <i data-lucide="bar-chart-2" style="width:16px;height:16px;color:#4f46e5;"></i> Score Chart
+                        </h3>
+                        <div class="overflow-x-auto pb-2">
+                            <div class="flex items-end gap-1.5" style="height:180px;min-width:${Math.max(analyticRecords.length * 56, 200)}px;padding-top:16px;">
+                                ${bars}
+                            </div>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <div class="h-px flex-1" style="background:#e2e8f0;"></div>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:#eff6ff;color:#2563eb;">Avg: ${avg.toFixed(1)}%</span>
+                            <div class="h-px flex-1" style="background:#e2e8f0;"></div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl p-5" style="background:#ffffff;border:1px solid #e2e8f0;">
+                        <h3 class="font-display text-sm font-bold mb-3 flex items-center gap-2" style="color:#1e293b;">
+                            <i data-lucide="pie-chart" style="width:16px;height:16px;color:#4f46e5;"></i> Grade Distribution
+                        </h3>
+                        <div class="flex flex-wrap gap-2 mb-4">${pills}</div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider mb-2" style="color:#94a3b8;">${currentFilter === 'all' ? 'Top Performers' : 'Top Subjects'}</h4>
+                        <div class="overflow-y-auto" style="max-height:200px;">${topRows}</div>
+                    </div>
+                </div>
+                <div class="rounded-xl p-5" style="background:#ffffff;border:1px solid #e2e8f0;">
+                    <h3 class="font-display text-sm font-bold mb-4 flex items-center gap-2" style="color:#1e293b;">
+                        <i data-lucide="target" style="width:16px;height:16px;color:#4f46e5;"></i> Performance Breakdown
+                    </h3>
+                    <div class="space-y-2.5">${progressBars}</div>
+                </div>`;
+
+            if (c) c.innerHTML = html;
+            if (cAlt) cAlt.innerHTML = html;
             lucide.createIcons();
         }
 

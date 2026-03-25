@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,123 @@ from settings import Settings
 settings = Settings()
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+CLASSES = ["FORM 1", "FORM 2", "FORM 3", "FORM 4"]
+TERMS = ["First Term", "Second Term", "Third Term"]
+FORM_1_2_CLASSES = {"FORM 1", "FORM 2"}
+
+
+def calc_grade_backend(score: int, student_class: str) -> dict:
+    """Calculate grade based on score and class"""
+    is_form1_or_2 = student_class in FORM_1_2_CLASSES
+
+    if is_form1_or_2:
+        if score >= 80:
+            return {"grade": "A", "points": 1, "result": "PASS"}
+        elif score >= 60:
+            return {"grade": "B", "points": 1, "result": "PASS"}
+        elif score >= 40:
+            return {"grade": "C", "points": 1, "result": "PASS"}
+        else:
+            return {"grade": "F", "points": 0, "result": "FAIL"}
+    else:
+        if score >= 90:
+            return {"grade": "1", "points": 1, "result": "DIST"}
+        elif score >= 80:
+            return {"grade": "2", "points": 2, "result": "DIST"}
+        elif score >= 70:
+            return {"grade": "3", "points": 3, "result": "STRONG CREDIT"}
+        elif score >= 66:
+            return {"grade": "4", "points": 4, "result": "CRED"}
+        elif score >= 60:
+            return {"grade": "5", "points": 5, "result": "CRED"}
+        elif score >= 50:
+            return {"grade": "6", "points": 6, "result": "CRED"}
+        elif score >= 46:
+            return {"grade": "7", "points": 7, "result": "PASS"}
+        elif score >= 40:
+            return {"grade": "8", "points": 8, "result": "PASS"}
+        else:
+            return {"grade": "9", "points": 9, "result": "FAIL"}
+
+
+def sync_report(db: Session, student_id: str, term: str, academic_year: str) -> None:
+    """Auto-create or update a school report from live grade_records."""
+    student = db.scalar(select(Student).where(Student.student_id == student_id))
+    if not student:
+        return
+
+    records = db.scalars(
+        select(GradeRecord)
+        .where(GradeRecord.student_id == student_id)
+        .where(GradeRecord.term == term)
+        .where(GradeRecord.academic_year == academic_year)
+    ).all()
+
+    scores = [r.score for r in records]
+    avg_score = sum(scores) / len(scores) if scores else 0.0
+    is_f12 = student.student_class in FORM_1_2_CLASSES
+
+    if is_f12:
+        aggregate = avg_score
+    else:
+        if records:
+            pts = sorted([calc_grade_backend(r.score, student.student_class)['points'] for r in records])
+            aggregate = float(sum(pts[:6]))
+        else:
+            aggregate = 0.0
+
+    app_settings = _read_settings(db)
+    report_data = {
+        "school_name": app_settings.school_name,
+        "student_id": student.student_id,
+        "student_name": student.name,
+        "student_class": student.student_class,
+        "term": term,
+        "academic_year": academic_year,
+        "subjects": [
+            {
+                "subject": r.subject,
+                "score": r.score,
+                "grade": calc_grade_backend(r.score, student.student_class)['grade'],
+                "result": calc_grade_backend(r.score, student.student_class)['result'],
+                "comment": r.teacher_comment,
+            }
+            for r in records
+        ],
+        "average_score": avg_score,
+        "aggregate": aggregate,
+        "is_form1_or_2": is_f12,
+        "has_grades": len(records) > 0,
+    }
+
+    existing = db.scalar(
+        select(SchoolReport)
+        .where(SchoolReport.student_id == student_id)
+        .where(SchoolReport.term == term)
+        .where(SchoolReport.academic_year == academic_year)
+    )
+
+    if existing:
+        existing.report_data = json.dumps(report_data)
+        existing.average_score = avg_score
+        existing.aggregate_points = aggregate
+        existing.total_subjects = len(records)
+        existing.student_name = student.name
+        existing.student_class = student.student_class
+    else:
+        db.add(SchoolReport(
+            student_id=student_id,
+            student_name=student.name,
+            student_class=student.student_class,
+            term=term,
+            academic_year=academic_year,
+            total_subjects=len(records),
+            average_score=avg_score,
+            aggregate_points=aggregate,
+            report_data=json.dumps(report_data),
+            position=None,
+        ))
 
 app = FastAPI(title="LIDOMA API", version="0.1.0")
 
@@ -38,7 +155,7 @@ allow_origin_regex = r"^https?://([a-z0-9-]+\.)*vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=allowed_origins + ["null", "file://"],
     allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
@@ -209,9 +326,9 @@ def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
 @app.on_event("startup")
 def _startup():
     init_db()
-    # Ensure admin user exists
     db = SessionLocal()
     try:
+        # Ensure admin user exists
         existing = db.scalar(select(User).where(User.username == settings.admin_username))
         if not existing:
             db.add(
@@ -222,6 +339,34 @@ def _startup():
                     is_active=True,
                 )
             )
+            db.commit()
+
+        # Deduplicate school_reports — keep only the latest per student/term/year
+        dupes = db.execute(
+            select(
+                SchoolReport.student_id,
+                SchoolReport.term,
+                SchoolReport.academic_year,
+                func.count(SchoolReport.id).label("cnt")
+            ).group_by(
+                SchoolReport.student_id,
+                SchoolReport.term,
+                SchoolReport.academic_year
+            ).having(func.count(SchoolReport.id) > 1)
+        ).all()
+
+        for row in dupes:
+            reports = db.scalars(
+                select(SchoolReport)
+                .where(SchoolReport.student_id == row.student_id)
+                .where(SchoolReport.term == row.term)
+                .where(SchoolReport.academic_year == row.academic_year)
+                .order_by(SchoolReport.id.desc())
+            ).all()
+            # Keep the first (latest), delete the rest
+            for r in reports[1:]:
+                db.delete(r)
+        if dupes:
             db.commit()
     finally:
         db.close()
@@ -430,6 +575,8 @@ def create_record(
     db.add(r)
     db.commit()
     db.refresh(r)
+    sync_report(db, r.student_id, r.term, r.academic_year)
+    db.commit()
     return RecordOut(
         id=r.id,
         student_id=r.student_id,
@@ -444,16 +591,29 @@ def create_record(
     )
 
 
+@app.delete("/api/records/clear", status_code=204)
+def clear_records(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    db.execute(delete(GradeRecord))
+    db.commit()
+    return Response(status_code=204)
+
+
 @app.delete("/api/records/{record_id}", status_code=204)
 def delete_record(
     record_id: int,
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    res = db.execute(delete(GradeRecord).where(GradeRecord.id == record_id))
-    if res.rowcount == 0:
-        db.rollback()
+    record = db.scalar(select(GradeRecord).where(GradeRecord.id == record_id))
+    if not record:
         raise HTTPException(status_code=404, detail="Record not found")
+    student_id, term, academic_year = record.student_id, record.term, record.academic_year
+    db.delete(record)
+    db.commit()
+    sync_report(db, student_id, term, academic_year)
     db.commit()
     return Response(status_code=204)
 
@@ -482,6 +642,8 @@ def update_record(
     
     db.commit()
     db.refresh(r)
+    sync_report(db, r.student_id, r.term, r.academic_year)
+    db.commit()
     return RecordOut(
         id=r.id,
         student_id=r.student_id,
@@ -494,16 +656,6 @@ def update_record(
         teacher_comment=r.teacher_comment,
         created_at=r.created_at,
     )
-
-
-@app.delete("/api/records/clear", status_code=204)
-def clear_records(
-    _: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    db.execute(delete(GradeRecord))
-    db.commit()
-    return Response(status_code=204)
 
 
 @app.post("/api/admin/settings", response_model=SettingsOut)
@@ -588,9 +740,33 @@ def list_reports(
     academic_year: str | None = None,
     search: str | None = None,
 ):
-    """List all reports with optional filters"""
-    q = select(SchoolReport).order_by(SchoolReport.student_class.asc(), SchoolReport.average_score.desc())
-    
+    """List all reports with live stats via a single aggregated query"""
+    from sqlalchemy import Float, cast
+
+    # Subquery: aggregate grade_records per student/term/year
+    grade_agg = (
+        select(
+            GradeRecord.student_id.label("sid"),
+            GradeRecord.term.label("term"),
+            GradeRecord.academic_year.label("year"),
+            func.count(GradeRecord.id).label("total_subjects"),
+            func.avg(cast(GradeRecord.score, Float)).label("avg_score"),
+        )
+        .group_by(GradeRecord.student_id, GradeRecord.term, GradeRecord.academic_year)
+        .subquery()
+    )
+
+    q = (
+        select(SchoolReport, grade_agg)
+        .outerjoin(
+            grade_agg,
+            (SchoolReport.student_id == grade_agg.c.sid)
+            & (SchoolReport.term == grade_agg.c.term)
+            & (SchoolReport.academic_year == grade_agg.c.year),
+        )
+        .order_by(SchoolReport.student_class.asc(), SchoolReport.average_score.desc())
+    )
+
     if student_class:
         q = q.where(SchoolReport.student_class == student_class)
     if term:
@@ -598,26 +774,67 @@ def list_reports(
     if academic_year:
         q = q.where(SchoolReport.academic_year == academic_year)
     if search:
-        search_term = f"%{search}%"
-        q = q.where((SchoolReport.student_name.ilike(search_term)) | (SchoolReport.student_id.ilike(search_term)))
-    
-    rows = db.scalars(q).all()
-    return [
-        ReportSummary(
+        s = f"%{search}%"
+        q = q.where(
+            SchoolReport.student_name.ilike(s) | SchoolReport.student_id.ilike(s)
+        )
+
+    rows = db.execute(q).all()
+
+    # For FORM 3/4: fetch all relevant grade records in one query (filtered by term+year too)
+    f34_rows = [r for r in rows if r.SchoolReport.student_class not in FORM_1_2_CLASSES and (r.total_subjects or 0) > 0]
+    agg_points_map: dict[tuple, float] = {}
+
+    if f34_rows:
+        from collections import defaultdict
+        student_ids = list({r.SchoolReport.student_id for r in f34_rows})
+        terms = list({r.SchoolReport.term for r in f34_rows})
+        years = list({r.SchoolReport.academic_year for r in f34_rows})
+
+        all_f34_records = db.scalars(
+            select(GradeRecord)
+            .where(GradeRecord.student_id.in_(student_ids))
+            .where(GradeRecord.term.in_(terms))
+            .where(GradeRecord.academic_year.in_(years))
+        ).all()
+
+        rec_map: dict[tuple, list[tuple[int, str]]] = defaultdict(list)
+        for rec in all_f34_records:
+            rec_map[(rec.student_id, rec.term, rec.academic_year)].append((rec.score, rec.student_class))
+
+        for row in f34_rows:
+            r = row.SchoolReport
+            key = (r.student_id, r.term, r.academic_year)
+            entries = rec_map.get(key, [])
+            if entries:
+                pts = sorted([calc_grade_backend(score, cls)['points'] for score, cls in entries])
+                agg_points_map[key] = float(sum(pts[:6]))
+            else:
+                agg_points_map[key] = 0.0
+
+    result = []
+    for row in rows:
+        r = row.SchoolReport
+        total = row.total_subjects or 0
+        avg = float(row.avg_score) if row.avg_score is not None else 0.0
+        key = (r.student_id, r.term, r.academic_year)
+        is_f12 = r.student_class in FORM_1_2_CLASSES
+        agg = avg if is_f12 else agg_points_map.get(key, 0.0)
+
+        result.append(ReportSummary(
             id=r.id,
             student_id=r.student_id,
             student_name=r.student_name,
             student_class=r.student_class,
             term=r.term,
             academic_year=r.academic_year,
-            total_subjects=r.total_subjects,
-            average_score=r.average_score,
-            aggregate_points=r.aggregate_points,
+            total_subjects=total,
+            average_score=avg,
+            aggregate_points=agg,
             position=r.position,
             created_at=r.created_at,
-        )
-        for r in rows
-    ]
+        ))
+    return result
 
 
 @app.get("/api/reports/{report_id}", response_model=ReportFull)
@@ -626,10 +843,59 @@ def get_report(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """Get full report details"""
+    """Get full report details with fresh grades from grade_records"""
     r = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
     if not r:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    # Always fetch fresh grades from grade_records
+    records = db.scalars(
+        select(GradeRecord)
+        .where(GradeRecord.student_id == r.student_id)
+        .where(GradeRecord.term == r.term)
+        .where(GradeRecord.academic_year == r.academic_year)
+        .order_by(GradeRecord.subject.asc())
+    ).all()
+
+    is_form1_or_2 = r.student_class in FORM_1_2_CLASSES
+    scores = [rec.score for rec in records]
+    avg_score = sum(scores) / len(scores) if scores else 0.0
+
+    if is_form1_or_2:
+        aggregate = avg_score
+    else:
+        if records:
+            sorted_pts = sorted([calc_grade_backend(rec.score, r.student_class)['points'] for rec in records])
+            aggregate = sum(sorted_pts[:6])
+        else:
+            aggregate = 0.0
+
+    settings = _read_settings(db)
+    stored = json.loads(r.report_data)
+
+    fresh_report_data = {
+        "school_name": stored.get("school_name") or settings.school_name,
+        "student_id": r.student_id,
+        "student_name": r.student_name,
+        "student_class": r.student_class,
+        "term": r.term,
+        "academic_year": r.academic_year,
+        "subjects": [
+            {
+                "subject": rec.subject,
+                "score": rec.score,
+                "grade": calc_grade_backend(rec.score, r.student_class)['grade'],
+                "result": calc_grade_backend(rec.score, r.student_class)['result'],
+                "comment": rec.teacher_comment,
+            }
+            for rec in records
+        ],
+        "average_score": avg_score,
+        "aggregate": aggregate,
+        "is_form1_or_2": is_form1_or_2,
+        "has_grades": len(records) > 0,
+    }
+
     return ReportFull(
         id=r.id,
         student_id=r.student_id,
@@ -637,12 +903,12 @@ def get_report(
         student_class=r.student_class,
         term=r.term,
         academic_year=r.academic_year,
-        total_subjects=r.total_subjects,
-        average_score=r.average_score,
-        aggregate_points=r.aggregate_points,
+        total_subjects=len(records),
+        average_score=avg_score,
+        aggregate_points=aggregate,
         position=r.position,
         created_at=r.created_at,
-        report_data=json.loads(r.report_data),
+        report_data=fresh_report_data,
         pdf_data=r.pdf_data,
     )
 
@@ -703,8 +969,7 @@ def generate_reports(
             avg_score = 0.0
             scores = []
         
-        # Calculate aggregate/points based on class
-        is_form1_or_2 = student_class in ['FORM 1', 'FORM 2']
+        is_form1_or_2 = student_class in FORM_1_2_CLASSES
         
         if is_form1_or_2:
             # For FORM 1&2: use average as aggregate
@@ -776,8 +1041,7 @@ def generate_reports(
         
         generated_count += 1
     
-    # Assign positions if requested and for FORM 1&2
-    if assign_positions and student_class in ['FORM 1', 'FORM 2']:
+    if assign_positions and student_class in FORM_1_2_CLASSES:
         assign_positions_in_class(db, student_class, term, academic_year)
     
     db.commit()
@@ -796,7 +1060,7 @@ def assign_positions_endpoint(
     term = payload.term
     academic_year = payload.academic_year
     
-    if not student_class or student_class not in ['FORM 1', 'FORM 2']:
+    if not student_class or student_class not in FORM_1_2_CLASSES:
         raise HTTPException(status_code=400, detail="Only FORM 1 and FORM 2 can have positions assigned")
     
     count = assign_positions_in_class(db, student_class, term, academic_year)
@@ -832,61 +1096,18 @@ def assign_positions_in_class(db: Session, student_class: str, term: str, academ
     return len(reports)
 
 
-def calc_grade_backend(score: int, student_class: str) -> dict:
-    """Calculate grade based on score and class"""
-    is_form1_or_2 = student_class in ['FORM 1', 'FORM 2']
+def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
+    """Build PDF elements for a school report - used by all PDF generation endpoints."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     
-    if is_form1_or_2:
-        if score >= 80:
-            return {"grade": "A", "points": 1, "result": "PASS"}
-        elif score >= 60:
-            return {"grade": "B", "points": 1, "result": "PASS"}
-        elif score >= 40:
-            return {"grade": "C", "points": 1, "result": "PASS"}
-        else:
-            return {"grade": "F", "points": 0, "result": "FAIL"}
-    else:
-        if score >= 90:
-            return {"grade": "1", "points": 1, "result": "DIST"}
-        elif score >= 80:
-            return {"grade": "2", "points": 2, "result": "DIST"}
-        elif score >= 70:
-            return {"grade": "3", "points": 3, "result": "STRONG CREDIT"}
-        elif score >= 66:
-            return {"grade": "4", "points": 4, "result": "CRED"}
-        elif score >= 60:
-            return {"grade": "5", "points": 5, "result": "CRED"}
-        elif score >= 50:
-            return {"grade": "6", "points": 6, "result": "CRED"}
-        elif score >= 46:
-            return {"grade": "7", "points": 7, "result": "PASS"}
-        elif score >= 40:
-            return {"grade": "8", "points": 8, "result": "PASS"}
-        else:
-            return {"grade": "9", "points": 9, "result": "FAIL"}
-
-
-@app.get("/api/reports/download/{report_id}")
-def download_report_pdf(
-    report_id: int,
-    _: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    """Download individual report as PDF"""
-    if not REPORTLAB_AVAILABLE:
-        raise HTTPException(status_code=500, detail="PDF generation library not available")
-    
-    report = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    
-    # Generate PDF
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    elements = []
     styles = getSampleStyleSheet()
+    elements = []
     
-    # Title
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -896,22 +1117,20 @@ def download_report_pdf(
         spaceAfter=12
     )
     
-    report_data = json.loads(report.report_data)
-    
     elements.append(Paragraph(f"{report_data.get('school_name', 'SCHOOL')}", title_style))
     elements.append(Paragraph("PROGRESS REPORT CARD", styles['Heading2']))
     elements.append(Spacer(1, 0.2*inch))
     
-    # Student Info
     info_data = [
-        [f"Student Name:", report.student_name],
-        [f"Student ID:", report.student_id],
-        [f"Class:", report.student_class],
-        [f"Term:", report.term],
-        [f"Academic Year:", report.academic_year],
+        ["Student Name:", report.student_name],
+        ["Student ID:", report.student_id],
+        ["Class:", report.student_class],
+        ["Term:", report.term],
+        ["Academic Year:", report.academic_year],
     ]
     if report.position:
-        info_data.append([f"Position:", f"{report.position}{'st' if report.position == 1 else 'nd' if report.position == 2 else 'rd' if report.position == 3 else 'th'}"])
+        suffix = 'st' if report.position == 1 else 'nd' if report.position == 2 else 'rd' if report.position == 3 else 'th'
+        info_data.append(["Position:", f"{report.position}{suffix}"])
     
     info_table = Table(info_data, colWidths=[2*inch, 3*inch])
     info_table.setStyle(TableStyle([
@@ -926,7 +1145,6 @@ def download_report_pdf(
     elements.append(info_table)
     elements.append(Spacer(1, 0.3*inch))
     
-    # Subjects Table
     subjects_data = [['Subject', 'Score', 'Grade', 'Result', 'Comment']]
     for subj in report_data.get('subjects', []):
         subjects_data.append([
@@ -954,12 +1172,11 @@ def download_report_pdf(
     elements.append(subjects_table)
     elements.append(Spacer(1, 0.3*inch))
     
-    # Summary
     summary_data = [
         ['Total Subjects:', str(report.total_subjects)],
         ['Average Score:', f"{report.average_score:.1f}%"],
     ]
-    if report.aggregate_points and report.student_class not in ['FORM 1', 'FORM 2']:
+    if report.aggregate_points and report.student_class not in FORM_1_2_CLASSES:
         summary_data.append(['Aggregate Points:', f"{report.aggregate_points:.1f}"])
     
     summary_table = Table(summary_data, colWidths=[2.5*inch, 2.5*inch])
@@ -973,6 +1190,28 @@ def download_report_pdf(
     ]))
     elements.append(summary_table)
     
+    return elements
+
+
+@app.get("/api/reports/download/{report_id}")
+def download_report_pdf(
+    report_id: int,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Download individual report as PDF"""
+    if not REPORTLAB_AVAILABLE:
+        raise HTTPException(status_code=500, detail="PDF generation library not available")
+    
+    report = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    report_data = json.loads(report.report_data)
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = _build_report_pdf_elements(report, report_data)
     doc.build(elements)
     buffer.seek(0)
     
@@ -1001,41 +1240,20 @@ def download_batch_reports(
     if not report_ids:
         raise HTTPException(status_code=400, detail="No report IDs provided")
     
-    # Get all reports
     reports = db.scalars(select(SchoolReport).where(SchoolReport.id.in_(report_ids))).all()
     
-    # Create ZIP in memory
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for report in reports:
-            # Generate PDF for each report
+            report_data = json.loads(report.report_data)
             pdf_buffer = BytesIO()
             doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
-            elements = []
-            styles = getSampleStyleSheet()
-            
-            report_data = json.loads(report.report_data)
-            
-            # Similar PDF generation logic as above (abbreviated for brevity)
-            title_style = ParagraphStyle(
-                'CustomTitle',
-                parent=styles['Heading1'],
-                fontSize=18,
-                textColor=colors.HexColor('#1e1b4b'),
-                fontName='Helvetica-Bold',
-                spaceAfter=12
-            )
-            
-            elements.append(Paragraph(f"{report_data.get('school_name', 'SCHOOL')}", title_style))
-            elements.append(Paragraph("PROGRESS REPORT CARD", styles['Heading2']))
-            elements.append(Spacer(1, 0.2*inch))
-            
-            # Build PDF
+            elements = _build_report_pdf_elements(report, report_data)
             doc.build(elements)
             pdf_buffer.seek(0)
             
-            # Add to ZIP
-            pdf_filename = f"{report.student_name}_{report.term}_{report.academic_year}_Report.pdf"
+            pos_prefix = f"{report.position}_" if report.position else ""
+            pdf_filename = f"{pos_prefix}{report.student_name}_{report.term}_{report.academic_year}_Report.pdf"
             zip_file.writestr(pdf_filename, pdf_buffer.getvalue())
     
     zip_buffer.seek(0)
@@ -1064,7 +1282,6 @@ def download_class_reports(
     term = payload.term
     academic_year = payload.academic_year
     
-    # Get all reports for the class
     reports = db.scalars(
         select(SchoolReport)
         .where(SchoolReport.student_class == student_class)
@@ -1076,34 +1293,18 @@ def download_class_reports(
     if not reports:
         raise HTTPException(status_code=404, detail="No reports found for this class")
     
-    # Create ZIP in memory
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for report in reports:
-            # Generate PDF for each report (same logic as above)
+            report_data = json.loads(report.report_data)
             pdf_buffer = BytesIO()
             doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
-            elements = []
-            styles = getSampleStyleSheet()
-            
-            report_data = json.loads(report.report_data)
-            
-            title_style = ParagraphStyle(
-                'CustomTitle',
-                parent=styles['Heading1'],
-                fontSize=18,
-                textColor=colors.HexColor('#1e1b4b'),
-                fontName='Helvetica-Bold',
-                spaceAfter=12
-            )
-            
-            elements.append(Paragraph(f"{report_data.get('school_name', 'SCHOOL')}", title_style))
-            elements.append(Paragraph("PROGRESS REPORT CARD", styles['Heading2']))
-            elements.append(Spacer(1, 0.2*inch))
+            elements = _build_report_pdf_elements(report, report_data)
             doc.build(elements)
             pdf_buffer.seek(0)
             
-            pdf_filename = f"{report.position or ''}_{report.student_name}_{report.term}_{report.academic_year}.pdf"
+            pos_prefix = f"{report.position}_" if report.position else ""
+            pdf_filename = f"{pos_prefix}{report.student_name}_{report.term}_{report.academic_year}_Report.pdf"
             zip_file.writestr(pdf_filename, pdf_buffer.getvalue())
     
     zip_buffer.seek(0)
