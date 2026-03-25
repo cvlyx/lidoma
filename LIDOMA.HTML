@@ -27,6 +27,7 @@
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
@@ -2191,6 +2192,24 @@
             document.getElementById('view-report-overlay').classList.add('hidden');
         }
 
+        async function generateReportPdfBlob(report) {
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;padding:32px;';
+            container.innerHTML = buildReportCardHTML(report);
+            document.body.appendChild(container);
+            try {
+                const pdf = await html2pdf().set({
+                    margin: 10,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(container.firstElementChild).toPdf().get('pdf');
+                return pdf.output('blob');
+            } finally {
+                document.body.removeChild(container);
+            }
+        }
+
         async function downloadReport(reportId) {
             try {
                 const report = await apiRequest(`/api/reports/${reportId}`);
@@ -2199,28 +2218,12 @@
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `${report.student_name}_${report.term}_${report.academic_year}.pdf`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (error) {
                 showToast('Failed to download: ' + error.message, 'error');
-            }
-        }
-
-        async function generateReportPdfBlob(report) {
-            const container = document.createElement('div');
-            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;padding:32px;';
-            container.innerHTML = buildReportCardHTML(report);
-            document.body.appendChild(container);
-            try {
-                const blob = await html2pdf().set({
-                    margin: 10,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                }).from(container.firstElementChild).outputPdf('blob');
-                return blob;
-            } finally {
-                document.body.removeChild(container);
             }
         }
 
@@ -2242,7 +2245,9 @@
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `reports_batch_${new Date().toISOString().split('T')[0]}.zip`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 showToast('Download ready!', 'success');
             } catch (error) {
@@ -2271,7 +2276,9 @@
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `${className}_${term}_Reports.zip`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 showToast('Download ready!', 'success');
             } catch (error) {
