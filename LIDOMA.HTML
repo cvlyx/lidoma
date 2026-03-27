@@ -3,8 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Exam Report Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <title>LIDOMA - School Exam Report Analyzer</title>
     <!-- Note: cdn.tailwindcss.com is used for standalone local development convenience. 
          For a formal production environment, Tailwind should be installed via PostCSS/CLI. -->
     <script>
@@ -35,6 +38,7 @@
     <style>
         * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         html,
@@ -42,6 +46,9 @@
             height: 100%;
             margin: 0;
             font-family: 'DM Sans', sans-serif;
+            overscroll-behavior: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .font-display {
@@ -98,6 +105,55 @@
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            body {
+                font-size: 14px;
+            }
+            
+            /* Better touch targets */
+            button, a, input, select {
+                min-height: 44px;
+            }
+            
+            /* Smooth scrolling */
+            * {
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Hide scrollbars on mobile for cleaner look */
+            ::-webkit-scrollbar {
+                display: none;
+            }
+            
+            /* Mobile-friendly modals */
+            .modal-content {
+                max-height: 85vh;
+                overflow-y: auto;
+            }
+            
+            /* Sticky headers on mobile */
+            .mobile-sticky {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background: white;
+            }
+        }
+        
+        /* Active state for touch */
+        button:active, .btn:active {
+            transform: scale(0.97);
+            transition: transform 0.1s;
+        }
+        
+        /* Improved input focus for mobile */
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
         @keyframes toastOut {
