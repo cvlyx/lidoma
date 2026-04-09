@@ -1814,7 +1814,7 @@
         let editingGradeId = null;
 
         function openEditGradeModal(rid) {
-            const record = allRecords.find(r => r.__backendId === rid);
+            const record = allRecords.find(r => r.__backendId === Number(rid));
             if (!record) return;
 
             editingGradeId = rid;
@@ -2823,7 +2823,7 @@
             countBadge.textContent = `${filteredRecords.length} subject${filteredRecords.length !== 1 ? 's' : ''}`;
 
             // Selective DOM update
-            const existingRows = new Map([...tbody.querySelectorAll('tr[data-rid]')].map(r => [r.dataset.rid, r]));
+            const existingRows = new Map([...tbody.querySelectorAll('tr[data-rid]')].map(r => [Number(r.dataset.rid), r]));
             const currentIds = new Set();
 
             filteredRecords.forEach((rec, i) => {
@@ -2878,7 +2878,8 @@
             // Attach delete handlers
             tbody.querySelectorAll('.del-btn').forEach(btn => {
                 btn.onclick = () => {
-                    deleteTarget = allRecords.find(r => r.__backendId === btn.dataset.rid);
+                    const rid = Number(btn.dataset.rid);
+                    deleteTarget = allRecords.find(r => r.__backendId === rid);
                     if (deleteTarget) document.getElementById('delete-overlay').classList.remove('hidden');
                 };
             });
@@ -2886,7 +2887,7 @@
             // Attach edit handlers
             tbody.querySelectorAll('.edit-grade-btn').forEach(btn => {
                 btn.onclick = () => {
-                    openEditGradeModal(btn.dataset.rid);
+                    openEditGradeModal(Number(btn.dataset.rid));
                 };
             });
 

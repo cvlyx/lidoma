@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 
@@ -717,7 +718,6 @@ def create_user(
 
 # ========== REPORT MANAGEMENT API ==========
 
-import json
 from io import BytesIO
 try:
     from reportlab.lib import colors
