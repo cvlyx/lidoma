@@ -347,7 +347,7 @@ def _startup():
             )
             db.commit()
 
-        # Deduplicate school_reports — keep only the latest per student/term/year
+        # Deduplicate school_reports — merge subjects then keep only one per student/term/year
         dupes = db.execute(
             select(
                 SchoolReport.student_id,
@@ -367,10 +367,14 @@ def _startup():
                 .where(SchoolReport.student_id == row.student_id)
                 .where(SchoolReport.term == row.term)
                 .where(SchoolReport.academic_year == row.academic_year)
-                .order_by(SchoolReport.id.desc())
+                .order_by(SchoolReport.id.asc())
             ).all()
+            # Keep the first (oldest), delete the rest
+            keep = reports[0]
             for r in reports[1:]:
                 db.delete(r)
+            # Re-sync the kept report with fresh grade data
+            sync_report(db, keep.student_id, keep.term, keep.academic_year)
         if dupes:
             db.commit()
 
@@ -1051,6 +1055,119 @@ def delete_report(
         raise HTTPException(status_code=404, detail="Report not found")
     db.commit()
     return Response(status_code=204)
+
+
+class ReportEditIn(BaseModel):
+    student_name: str | None = Field(default=None, max_length=120)
+    term: str | None = Field(default=None, max_length=32)
+    academic_year: str | None = Field(default=None, max_length=32)
+    subjects: list[dict] | None = None  # [{subject, score, teacher_comment}]
+
+
+@app.put("/api/reports/{report_id}", response_model=ReportFull)
+def edit_report(
+    report_id: int,
+    payload: ReportEditIn,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Edit a report's subjects/scores directly via grade_records"""
+    r = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
+    if not r:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    if payload.subjects is not None:
+        for subj_data in payload.subjects:
+            subject = subj_data.get("subject", "").strip()
+            score = subj_data.get("score")
+            comment = subj_data.get("teacher_comment", None)
+            if not subject or score is None:
+                continue
+            score = max(0, min(100, int(score)))
+            rec = db.scalar(
+                select(GradeRecord)
+                .where(GradeRecord.student_id == r.student_id)
+                .where(GradeRecord.term == r.term)
+                .where(GradeRecord.academic_year == r.academic_year)
+                .where(func.lower(GradeRecord.subject) == subject.lower())
+            )
+            if rec:
+                rec.score = score
+                if comment is not None:
+                    rec.teacher_comment = comment
+            else:
+                db.add(GradeRecord(
+                    student_id=r.student_id,
+                    student_name=r.student_name,
+                    student_class=r.student_class,
+                    term=r.term,
+                    academic_year=r.academic_year,
+                    subject=subject,
+                    score=score,
+                    teacher_comment=comment,
+                ))
+        db.commit()
+
+    sync_report(db, r.student_id, r.term, r.academic_year)
+    db.commit()
+    db.refresh(r)
+
+    records = db.scalars(
+        select(GradeRecord)
+        .where(GradeRecord.student_id == r.student_id)
+        .where(GradeRecord.term == r.term)
+        .where(GradeRecord.academic_year == r.academic_year)
+        .order_by(GradeRecord.subject.asc())
+    ).all()
+    scores = [rec.score for rec in records]
+    avg_score = sum(scores) / len(scores) if scores else 0.0
+    is_f12 = r.student_class in FORM_1_2_CLASSES
+    if is_f12:
+        aggregate = avg_score
+    else:
+        pts = sorted([calc_grade_backend(rec.score, r.student_class)['points'] for rec in records])
+        aggregate = float(sum(pts[:6])) if pts else 0.0
+
+    fresh_data = json.loads(r.report_data)
+    return ReportFull(
+        id=r.id, student_id=r.student_id, student_name=r.student_name,
+        student_class=r.student_class, term=r.term, academic_year=r.academic_year,
+        total_subjects=len(records), average_score=avg_score, aggregate_points=aggregate,
+        position=r.position, created_at=r.created_at, report_data=fresh_data,
+    )
+
+
+@app.post("/api/reports/cleanup", status_code=200)
+def cleanup_duplicate_reports(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Merge and remove duplicate reports for the same student/term/year"""
+    dupes = db.execute(
+        select(
+            SchoolReport.student_id,
+            SchoolReport.term,
+            SchoolReport.academic_year,
+            func.count(SchoolReport.id).label("cnt")
+        ).group_by(SchoolReport.student_id, SchoolReport.term, SchoolReport.academic_year)
+        .having(func.count(SchoolReport.id) > 1)
+    ).all()
+
+    cleaned = 0
+    for row in dupes:
+        reports = db.scalars(
+            select(SchoolReport)
+            .where(SchoolReport.student_id == row.student_id)
+            .where(SchoolReport.term == row.term)
+            .where(SchoolReport.academic_year == row.academic_year)
+            .order_by(SchoolReport.id.asc())
+        ).all()
+        for r in reports[1:]:
+            db.delete(r)
+            cleaned += 1
+        sync_report(db, row.student_id, row.term, row.academic_year)
+    db.commit()
+    return {"ok": True, "duplicates_removed": cleaned}
 
 
 @app.post("/api/reports/generate")

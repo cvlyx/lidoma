@@ -653,6 +653,14 @@
                         </span>
                     </h2>
                     <div class="flex items-center gap-3">
+                        <button onclick="cleanupDuplicateReports()" 
+                            class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
+                            style="background:#fef3c7;color:#d97706;border:1px solid #fde68a;">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                                Fix Duplicates
+                            </span>
+                        </button>
                         <button onclick="downloadSelectedReports()" id="btn-download-selected" disabled
                             class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
                             style="background:#059669;color:#ffffff;">
@@ -923,6 +931,24 @@
                             class="flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all hover:opacity-95 active:scale-95"
                             style="background:#4f46e5;color:#ffffff;">Save Changes</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Report Modal -->
+        <div id="edit-report-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center no-print"
+            style="background:rgba(15,23,42,0.75);">
+            <div class="rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl" style="background:#ffffff;border:1px solid #e2e8f0;max-height:90vh;overflow-y:auto;">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-display text-lg font-bold" style="color:#1e293b;">Edit Report Card</h3>
+                    <button onclick="closeEditReportModal()" class="p-1.5 rounded-lg hover:bg-slate-100"><i data-lucide="x" style="width:18px;height:18px;color:#64748b;"></i></button>
+                </div>
+                <div id="edit-report-student-info" class="mb-4 p-3 rounded-lg text-sm" style="background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;"></div>
+                <div id="edit-report-subjects-list" class="space-y-2 mb-4"></div>
+                <div id="edit-report-error" class="text-xs hidden mb-3" style="color:#dc2626;"></div>
+                <div class="flex gap-3 pt-4 border-t border-slate-100">
+                    <button onclick="closeEditReportModal()" class="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold" style="border:1px solid #e2e8f0;color:#64748b;">Cancel</button>
+                    <button onclick="saveEditedReport()" id="btn-save-edit-report" class="flex-1 rounded-lg px-4 py-2.5 text-sm font-bold" style="background:#4f46e5;color:#ffffff;">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -1995,8 +2021,9 @@
                     <td class="text-center px-4 py-3">
                         <div class="flex items-center justify-center gap-2">
                             <button onclick="viewReport(${report.id})" title="View" class="rounded-lg p-1.5 transition-colors" style="background:#eff6ff;color:#2563eb;"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
+                            <button onclick="editReport(${report.id})" title="Edit" class="rounded-lg p-1.5 transition-colors" style="background:#fef3c7;color:#d97706;"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
                             <button onclick="downloadReport(${report.id})" title="Download" class="rounded-lg p-1.5 transition-colors" style="background:#f0fdf4;color:#059669;"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
-                            ${isForm1Or2 ? `<button onclick="assignPosition(${report.id})" title="Assign Position" class="rounded-lg p-1.5 transition-colors" style="background:#fef3c7;color:#d97706;"><i data-lucide="award" style="width:14px;height:14px;"></i></button>` : ''}
+                            ${isForm1Or2 ? `<button onclick="assignPosition(${report.id})" title="Assign Position" class="rounded-lg p-1.5 transition-colors" style="background:#f5f3ff;color:#7c3aed;"><i data-lucide="award" style="width:14px;height:14px;"></i></button>` : ''}
                             <button onclick="deleteReport(${report.id})" title="Delete" class="rounded-lg p-1.5 transition-colors" style="background:#fef2f2;color:#dc2626;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
                         </div>
                     </td>
@@ -2371,6 +2398,105 @@
                 loadReports();
             } catch (error) {
                 showToast('Failed to delete: ' + error.message, 'error');
+            }
+        }
+
+        // ========== EDIT REPORT ==========
+        let editingReportId = null;
+        let editingReportSubjects = [];
+
+        async function editReport(reportId) {
+            try {
+                const report = await apiRequest(`/api/reports/${reportId}`);
+                editingReportId = reportId;
+                editingReportSubjects = report.report_data.subjects || [];
+
+                document.getElementById('edit-report-student-info').innerHTML =
+                    `<strong>${report.student_name}</strong> &nbsp;|&nbsp; ${report.student_class} &nbsp;|&nbsp; ${report.term} &nbsp;|&nbsp; ${report.academic_year}`;
+
+                const list = document.getElementById('edit-report-subjects-list');
+                list.innerHTML = editingReportSubjects.map((s, i) => `
+                    <div class="flex items-center gap-3 p-3 rounded-lg" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <div class="flex-1">
+                            <input type="text" value="${s.subject}" placeholder="Subject"
+                                class="w-full rounded-lg px-3 py-2 text-sm" style="border:1px solid #cbd5e1;"
+                                id="edit-report-subj-${i}">
+                        </div>
+                        <div class="w-24">
+                            <input type="number" min="0" max="100" value="${s.score}" placeholder="Score"
+                                class="w-full rounded-lg px-3 py-2 text-sm text-center" style="border:1px solid #cbd5e1;"
+                                id="edit-report-score-${i}">
+                        </div>
+                        <div class="flex-1">
+                            <input type="text" value="${s.comment || ''}" placeholder="Comment"
+                                class="w-full rounded-lg px-3 py-2 text-sm" style="border:1px solid #cbd5e1;"
+                                id="edit-report-comment-${i}">
+                        </div>
+                        <button onclick="removeEditReportRow(${i})" class="p-1.5 rounded-lg" style="color:#dc2626;background:#fef2f2;">
+                            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                        </button>
+                    </div>
+                `).join('');
+
+                document.getElementById('edit-report-error').classList.add('hidden');
+                const overlay = document.getElementById('edit-report-overlay');
+                overlay.classList.remove('hidden');
+                lucide.createIcons({ nodes: [overlay] });
+            } catch (e) {
+                showToast('Failed to load report: ' + e.message, 'error');
+            }
+        }
+
+        function removeEditReportRow(index) {
+            editingReportSubjects.splice(index, 1);
+            editReport(editingReportId); // re-render
+        }
+
+        function closeEditReportModal() {
+            document.getElementById('edit-report-overlay').classList.add('hidden');
+            editingReportId = null;
+        }
+
+        async function saveEditedReport() {
+            const errorEl = document.getElementById('edit-report-error');
+            const subjects = editingReportSubjects.map((s, i) => ({
+                subject: document.getElementById(`edit-report-subj-${i}`)?.value.trim() || s.subject,
+                score: parseInt(document.getElementById(`edit-report-score-${i}`)?.value) || s.score,
+                teacher_comment: document.getElementById(`edit-report-comment-${i}`)?.value.trim() || null,
+            })).filter(s => s.subject && !isNaN(s.score));
+
+            if (subjects.length === 0) {
+                errorEl.textContent = 'Please add at least one subject with a valid score.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-edit-report');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            try {
+                await apiRequest(`/api/reports/${editingReportId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subjects })
+                });
+                showToast('Report updated successfully', 'success');
+                closeEditReportModal();
+                loadReports();
+            } catch (e) {
+                errorEl.textContent = e.message || 'Failed to save';
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Save Changes';
+            }
+        }
+
+        async function cleanupDuplicateReports() {
+            try {
+                const res = await apiRequest('/api/reports/cleanup', { method: 'POST' });
+                showToast(`Cleaned up ${res.duplicates_removed} duplicate report(s)`, 'success');
+                loadReports();
+            } catch (e) {
+                showToast('Cleanup failed: ' + e.message, 'error');
             }
         }
 
