@@ -1094,6 +1094,9 @@
         const API_BASE = 'https://lidoma-backend.onrender.com';
         const TOKEN_KEY = 'lidoma_jwt';
 
+        // Keep-alive ping every 10 minutes to prevent Render free tier cold starts
+        setInterval(() => fetch(API_BASE + '/api/health').catch(() => {}), 10 * 60 * 1000);
+
         function getToken() {
             return sessionStorage.getItem(TOKEN_KEY) || '';
         }
@@ -1501,18 +1504,21 @@
                     authBtn.innerHTML = '<span class="spinner"></span> Logging in...';
                     try {
                         await login(userInp.value.trim(), passInp.value);
-                        // After login, load fresh data
-                        students = await StudentDB.getAll();
-                        await StudentDB.save(students);
-                        const records = await LocalDB.getAll();
-                        allRecords = records;
+                        // After login, load all data in one request
+                        const init = await apiRequest('/api/init');
+                        students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
+                        allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
+                        if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
+                        if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
+                        if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
+                        renderStudents();
+                        updateEntryStudentSelect();
                         updateStudentFilterOptions();
                         renderAll();
                     } catch (e) {
                         authErr.textContent = e.message || 'Login failed';
                         authErr.classList.remove('hidden');
                     } finally {
-                        // Reset button state
                         authBtn.disabled = false;
                         authBtn.innerHTML = originalText;
                     }
@@ -1529,25 +1535,23 @@
                 await setupLogoManager();
                 // Initialize settings tab
                 await initSettings();
-                // Attempt to pre-convert initial logo (might fail on file:// origin)
-                await convertLogoToBase64();
 
-                // Load Settings
-                const settings = await SettingsDB.get();
-                if (settings.academic_year) document.getElementById('inp-academic-year').value = settings.academic_year;
-
-                // Load Students
-                students = await StudentDB.getAll();
-                renderStudents();
-                updateEntryStudentSelect();
-                generateRegLID();
-
-                const localData = await LocalDB.getAll();
-                if (localData && localData.length > 0) {
-                    allRecords = localData;
+                // Load all startup data in ONE request
+                try {
+                    const init = await apiRequest('/api/init');
+                    students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
+                    allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
+                    if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
+                    if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
+                    if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
+                    renderStudents();
+                    updateEntryStudentSelect();
                     updateStudentFilterOptions();
                     renderAll();
+                } catch (e) {
+                    console.error('Init load error:', e);
                 }
+                generateRegLID();
             } catch (e) {
                 console.error('LocalDB init error:', e);
             }

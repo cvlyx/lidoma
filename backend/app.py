@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
@@ -20,7 +21,8 @@ from settings import Settings
 
 
 settings = Settings()
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Reduce argon2 rounds for faster login while staying secure
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto", argon2__time_cost=1, argon2__memory_cost=65536)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 CLASSES = ["FORM 1", "FORM 2", "FORM 3", "FORM 4"]
@@ -79,16 +81,19 @@ def sync_report(db: Session, student_id: str, term: str, academic_year: str) -> 
     avg_score = sum(scores) / len(scores) if scores else 0.0
     is_f12 = student.student_class in FORM_1_2_CLASSES
 
+    # Compute grades once per record
+    grades = [calc_grade_backend(r.score, student.student_class) for r in records]
+
     if is_f12:
         aggregate = avg_score
     else:
         if records:
-            pts = sorted([calc_grade_backend(r.score, student.student_class)['points'] for r in records])
+            pts = sorted(g['points'] for g in grades)
             aggregate = float(sum(pts[:6]))
         else:
             aggregate = 0.0
 
-    app_settings = _read_settings(db)
+    app_settings = _read_settings_cached(db)
     report_data = {
         "school_name": app_settings.school_name,
         "student_id": student.student_id,
@@ -100,11 +105,11 @@ def sync_report(db: Session, student_id: str, term: str, academic_year: str) -> 
             {
                 "subject": r.subject,
                 "score": r.score,
-                "grade": calc_grade_backend(r.score, student.student_class)['grade'],
-                "result": calc_grade_backend(r.score, student.student_class)['result'],
+                "grade": g['grade'],
+                "result": g['result'],
                 "comment": r.teacher_comment,
             }
-            for r in records
+            for r, g in zip(records, grades)
         ],
         "average_score": avg_score,
         "aggregate": aggregate,
@@ -430,6 +435,35 @@ def health():
     return {"ok": True}
 
 
+@app.get("/api/init")
+def init_data(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Single endpoint to load all startup data in one round-trip."""
+    students = db.scalars(select(Student).order_by(Student.created_at.desc())).all()
+    records = db.scalars(select(GradeRecord).order_by(GradeRecord.created_at.desc())).all()
+    cfg = _read_settings_cached(db)
+    logo = db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
+    return {
+        "students": [
+            {"student_id": s.student_id, "name": s.name, "student_class": s.student_class, "created_at": s.created_at.isoformat()}
+            for s in students
+        ],
+        "records": [
+            {
+                "id": r.id, "student_id": r.student_id, "student_name": r.student_name,
+                "student_class": r.student_class, "term": r.term, "academic_year": r.academic_year,
+                "subject": r.subject, "score": r.score, "teacher_comment": r.teacher_comment,
+                "created_at": r.created_at.isoformat()
+            }
+            for r in records
+        ],
+        "settings": {"school_name": cfg.school_name, "academic_year": cfg.academic_year, "report_title": cfg.report_title},
+        "logo_data_url": logo.data_url if logo else None,
+    }
+
+
 @app.post("/api/auth/login", response_model=TokenOut)
 def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annotated[Session, Depends(get_db)]
@@ -509,6 +543,19 @@ def _read_settings(db: Session) -> SettingsOut:
         academic_year=d.get("academic_year"),
         report_title=d.get("report_title"),
     )
+
+# In-memory settings cache (invalidated on save)
+_settings_cache: SettingsOut | None = None
+
+def _read_settings_cached(db: Session) -> SettingsOut:
+    global _settings_cache
+    if _settings_cache is None:
+        _settings_cache = _read_settings(db)
+    return _settings_cache
+
+def _invalidate_settings_cache() -> None:
+    global _settings_cache
+    _settings_cache = None
 
 
 # ---------- Teacher/Admin ----------
@@ -757,6 +804,7 @@ def upsert_settings(
         else:
             db.add(AppSetting(key=k, value=v))
     db.commit()
+    _invalidate_settings_cache()
     return _read_settings(db)
 
 
