@@ -27,6 +27,7 @@ class User(Base):
 
 class Student(Base):
     __tablename__ = "students"
+    __table_args__ = (UniqueConstraint("name", "student_class", name="uq_student_name_class"),)
 
     student_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(120), index=True)
@@ -36,6 +37,7 @@ class Student(Base):
 
 class GradeRecord(Base):
     __tablename__ = "grade_records"
+    __table_args__ = (UniqueConstraint("student_id", "term", "academic_year", "subject", name="uq_grade_student_term_year_subject"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     student_id: Mapped[str] = mapped_column(String(32), ForeignKey("students.student_id", ondelete="CASCADE"), index=True)

@@ -364,10 +364,62 @@ def _startup():
                 .where(SchoolReport.academic_year == row.academic_year)
                 .order_by(SchoolReport.id.desc())
             ).all()
-            # Keep the first (latest), delete the rest
             for r in reports[1:]:
                 db.delete(r)
         if dupes:
+            db.commit()
+
+        # Deduplicate grade_records — keep only the latest per student/term/year/subject
+        grade_dupes = db.execute(
+            select(
+                GradeRecord.student_id,
+                GradeRecord.term,
+                GradeRecord.academic_year,
+                func.lower(GradeRecord.subject).label("subj"),
+                func.count(GradeRecord.id).label("cnt")
+            ).group_by(
+                GradeRecord.student_id,
+                GradeRecord.term,
+                GradeRecord.academic_year,
+                func.lower(GradeRecord.subject)
+            ).having(func.count(GradeRecord.id) > 1)
+        ).all()
+
+        for row in grade_dupes:
+            recs = db.scalars(
+                select(GradeRecord)
+                .where(GradeRecord.student_id == row.student_id)
+                .where(GradeRecord.term == row.term)
+                .where(GradeRecord.academic_year == row.academic_year)
+                .where(func.lower(GradeRecord.subject) == row.subj)
+                .order_by(GradeRecord.id.desc())
+            ).all()
+            for r in recs[1:]:
+                db.delete(r)
+        if grade_dupes:
+            db.commit()
+
+        # Deduplicate students — same name+class, keep the oldest
+        student_dupes = db.execute(
+            select(
+                Student.name,
+                Student.student_class,
+                func.count(Student.student_id).label("cnt")
+            ).group_by(Student.name, Student.student_class)
+            .having(func.count(Student.student_id) > 1)
+        ).all()
+
+        for row in student_dupes:
+            studs = db.scalars(
+                select(Student)
+                .where(Student.name == row.name)
+                .where(Student.student_class == row.student_class)
+                .order_by(Student.created_at.asc())
+            ).all()
+            for s in studs[1:]:
+                db.execute(delete(GradeRecord).where(GradeRecord.student_id == s.student_id))
+                db.delete(s)
+        if student_dupes:
             db.commit()
     finally:
         db.close()
@@ -487,7 +539,7 @@ def create_student(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Student already exists")
+        raise HTTPException(status_code=409, detail="A student with this ID or the same name in this class already exists")
     return StudentOut(student_id=s.student_id, name=s.name, student_class=s.student_class, created_at=s.created_at)
 
 
@@ -516,7 +568,17 @@ def update_student(
     s = db.scalar(select(Student).where(Student.student_id == student_id))
     if not s:
         raise HTTPException(status_code=404, detail="Student not found")
-    
+
+    # Check name+class uniqueness (excluding self)
+    existing = db.scalar(
+        select(Student)
+        .where(Student.name == payload.name)
+        .where(Student.student_class == payload.student_class)
+        .where(Student.student_id != student_id)
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="A student with this name already exists in this class")
+
     s.name = payload.name
     s.student_class = payload.student_class
     db.commit()
@@ -563,6 +625,17 @@ def create_record(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
+    # Check for duplicate subject for same student/term/year
+    existing = db.scalar(
+        select(GradeRecord)
+        .where(GradeRecord.student_id == payload.student_id)
+        .where(GradeRecord.term == payload.term)
+        .where(GradeRecord.academic_year == payload.academic_year)
+        .where(func.lower(GradeRecord.subject) == func.lower(payload.subject))
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail=f"{payload.subject} already entered for this student in this term")
+
     r = GradeRecord(
         student_id=payload.student_id,
         student_name=payload.student_name,
@@ -574,7 +647,11 @@ def create_record(
         teacher_comment=payload.teacher_comment,
     )
     db.add(r)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=f"{payload.subject} already entered for this student in this term")
     db.refresh(r)
     sync_report(db, r.student_id, r.term, r.academic_year)
     db.commit()
