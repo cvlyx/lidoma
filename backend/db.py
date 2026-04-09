@@ -17,9 +17,10 @@ engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
     poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=2,
+    max_overflow=3,
     pool_timeout=30,
+    connect_args={"connect_timeout": 10},
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
