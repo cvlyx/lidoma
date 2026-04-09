@@ -117,14 +117,20 @@ def sync_report(db: Session, student_id: str, term: str, academic_year: str) -> 
         "has_grades": len(records) > 0,
     }
 
-    existing = db.scalar(
+    # Fetch ALL matching reports (there may be duplicates from old data)
+    all_existing = db.scalars(
         select(SchoolReport)
         .where(SchoolReport.student_id == student_id)
         .where(SchoolReport.term == term)
         .where(SchoolReport.academic_year == academic_year)
-    )
+        .order_by(SchoolReport.id.asc())
+    ).all()
 
-    if existing:
+    if all_existing:
+        # Keep the first, delete any extras
+        existing = all_existing[0]
+        for dup in all_existing[1:]:
+            db.delete(dup)
         existing.report_data = json.dumps(report_data)
         existing.average_score = avg_score
         existing.aggregate_points = aggregate
@@ -1253,19 +1259,25 @@ def generate_reports(
             "has_grades": len(records) > 0
         }
         
-        # Check if report already exists
-        existing = db.scalar(
+        # Check if report already exists — handle duplicates
+        all_existing = db.scalars(
             select(SchoolReport)
             .where(SchoolReport.student_id == student.student_id)
             .where(SchoolReport.term == term)
             .where(SchoolReport.academic_year == academic_year)
-        )
-        
-        if existing:
+            .order_by(SchoolReport.id.asc())
+        ).all()
+
+        if all_existing:
+            existing = all_existing[0]
+            for dup in all_existing[1:]:
+                db.delete(dup)
             existing.report_data = json.dumps(report_data)
             existing.average_score = avg_score
             existing.aggregate_points = aggregate if not is_form1_or_2 else avg_score
             existing.total_subjects = len(records)
+            existing.student_name = student.name
+            existing.student_class = student_class
         else:
             new_report = SchoolReport(
                 student_id=student.student_id,
