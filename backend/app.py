@@ -375,14 +375,17 @@ def _startup():
                 .where(SchoolReport.academic_year == row.academic_year)
                 .order_by(SchoolReport.id.asc())
             ).all()
-            # Keep the first (oldest), delete the rest
-            keep = reports[0]
             for r in reports[1:]:
                 db.delete(r)
-            # Re-sync the kept report with fresh grade data
-            sync_report(db, keep.student_id, keep.term, keep.academic_year)
+            sync_report(db, row.student_id, row.term, row.academic_year)
         if dupes:
             db.commit()
+
+        # Re-sync ALL reports so subjects are always up to date
+        all_reports = db.scalars(select(SchoolReport)).all()
+        for r in all_reports:
+            sync_report(db, r.student_id, r.term, r.academic_year)
+        db.commit()
 
         # Deduplicate grade_records — keep only the latest per student/term/year/subject
         grade_dupes = db.execute(
@@ -1148,7 +1151,13 @@ def cleanup_duplicate_reports(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """Merge and remove duplicate reports for the same student/term/year"""
+    """
+    Full cleanup:
+    1. Delete duplicate school_reports (same student/term/year) keeping lowest id
+    2. Re-sync every remaining report from live grade_records
+    3. Delete reports that have zero subjects after sync
+    """
+    # Step 1: find and delete duplicate reports, keep lowest id
     dupes = db.execute(
         select(
             SchoolReport.student_id,
@@ -1160,6 +1169,7 @@ def cleanup_duplicate_reports(
     ).all()
 
     cleaned = 0
+    affected = set()
     for row in dupes:
         reports = db.scalars(
             select(SchoolReport)
@@ -1171,9 +1181,30 @@ def cleanup_duplicate_reports(
         for r in reports[1:]:
             db.delete(r)
             cleaned += 1
-        sync_report(db, row.student_id, row.term, row.academic_year)
+        affected.add((row.student_id, row.term, row.academic_year))
     db.commit()
-    return {"ok": True, "duplicates_removed": cleaned}
+
+    # Step 2: re-sync ALL reports from live grade_records
+    all_reports = db.scalars(select(SchoolReport)).all()
+    for r in all_reports:
+        sync_report(db, r.student_id, r.term, r.academic_year)
+    db.commit()
+
+    # Step 3: remove reports with no grade records at all
+    empty = db.scalars(
+        select(SchoolReport).where(SchoolReport.total_subjects == 0)
+    ).all()
+    empty_removed = len(empty)
+    for r in empty:
+        db.delete(r)
+    db.commit()
+
+    return {
+        "ok": True,
+        "duplicates_removed": cleaned,
+        "empty_reports_removed": empty_removed,
+        "total_resynced": len(all_reports)
+    }
 
 
 @app.post("/api/reports/generate")
