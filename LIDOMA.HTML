@@ -1158,19 +1158,9 @@
             const mainLogo = document.getElementById('school-logo-main');
             const settingsLogo = document.getElementById('settings-logo-preview');
 
-            // Load from backend (public) on start; fallback to localStorage for older offline data
-            try {
-                const logo = await apiRequest('/api/public/logo');
-                if (logo && logo.data_url) {
-                    logoDataURL = logo.data_url;
-                } else {
-                    const savedLogo = localStorage.getItem(LOGO_KEY);
-                    if (savedLogo) logoDataURL = savedLogo;
-                }
-            } catch (e) {
-                const savedLogo = localStorage.getItem(LOGO_KEY);
-                if (savedLogo) logoDataURL = savedLogo;
-            }
+            // Use cached logo from localStorage only — /api/init will update it after login
+            const savedLogo = localStorage.getItem(LOGO_KEY);
+            if (savedLogo) logoDataURL = savedLogo;
 
             if (mainLogo) mainLogo.src = logoDataURL;
             if (settingsLogo) settingsLogo.src = logoDataURL;
@@ -1260,10 +1250,11 @@
             const yearInput = document.getElementById('set-academic-year');
             const saveBtn = document.getElementById('btn-save-settings');
 
-            // Load initial values
-            const settings = await SettingsDB.get();
+            // Use localStorage cache only — /api/init will populate after login
+            const cached = localStorage.getItem(SETTINGS_KEY);
+            const settings = cached ? JSON.parse(cached) : {};
             const cfg = (window.elementSdk && window.elementSdk.config) ? window.elementSdk.config : defaultConfig;
-            
+
             schoolInput.value = settings.school_name || cfg.school_name || defaultConfig.school_name;
             yearInput.value = settings.academic_year || cfg.academic_year || defaultConfig.academic_year;
 
@@ -1275,11 +1266,8 @@
                 SettingsDB.save(newSettings).catch((e) => {
                     showToast(e.message || 'Failed to save settings', 'error');
                 });
-                
-                // Update UI immediately
                 document.getElementById('school-name-display').textContent = newSettings.school_name;
                 document.getElementById('year-badge').textContent = newSettings.academic_year;
-                
                 showToast('Settings saved successfully');
             };
         }
@@ -1536,20 +1524,24 @@
                 // Initialize settings tab
                 await initSettings();
 
-                // Load all startup data in ONE request
-                try {
-                    const init = await apiRequest('/api/init');
-                    students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
-                    allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
-                    if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
-                    if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
-                    if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
-                    renderStudents();
-                    updateEntryStudentSelect();
-                    updateStudentFilterOptions();
-                    renderAll();
-                } catch (e) {
-                    console.error('Init load error:', e);
+                // Only load data if already authenticated
+                if (getToken()) {
+                    try {
+                        const init = await apiRequest('/api/init');
+                        students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
+                        allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
+                        if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
+                        if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
+                        if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
+                        renderStudents();
+                        updateEntryStudentSelect();
+                        updateStudentFilterOptions();
+                        renderAll();
+                    } catch (e) {
+                        // Token expired or invalid — show login
+                        setToken(null);
+                        showAuthOverlay();
+                    }
                 }
                 generateRegLID();
             } catch (e) {
