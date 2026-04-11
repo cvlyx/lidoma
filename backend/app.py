@@ -353,7 +353,7 @@ def _startup():
             )
             db.commit()
 
-        # Deduplicate school_reports — merge subjects then keep only one per student/term/year
+        # Deduplicate school_reports — keep only the lowest id per student/term/year, delete the rest
         dupes = db.execute(
             select(
                 SchoolReport.student_id,
@@ -377,6 +377,10 @@ def _startup():
             ).all()
             for r in reports[1:]:
                 db.delete(r)
+        if dupes:
+            db.commit()
+        # Re-sync the canonical reports after dedup
+        for row in dupes:
             sync_report(db, row.student_id, row.term, row.academic_year)
         if dupes:
             db.commit()
@@ -881,6 +885,13 @@ def list_reports(
     """List all reports with live stats via a single aggregated query"""
     from sqlalchemy import Float, cast
 
+    # Subquery: keep only the canonical (lowest id) report per student/term/year
+    canonical_ids = (
+        select(func.min(SchoolReport.id).label("min_id"))
+        .group_by(SchoolReport.student_id, SchoolReport.term, SchoolReport.academic_year)
+        .subquery()
+    )
+
     # Subquery: aggregate grade_records per student/term/year
     grade_agg = (
         select(
@@ -896,6 +907,7 @@ def list_reports(
 
     q = (
         select(SchoolReport, grade_agg)
+        .where(SchoolReport.id.in_(select(canonical_ids.c.min_id)))
         .outerjoin(
             grade_agg,
             (SchoolReport.student_id == grade_agg.c.sid)
