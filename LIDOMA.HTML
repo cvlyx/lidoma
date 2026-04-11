@@ -2492,12 +2492,16 @@
         }
 
         async function cleanupDuplicateReports() {
+            const btn = document.querySelector('button[onclick="cleanupDuplicateReports()"]');
+            if (btn) { btn.disabled = true; btn.textContent = 'Cleaning...'; }
             try {
                 const res = await apiRequest('/api/reports/cleanup', { method: 'POST' });
                 showToast(`Cleaned up ${res.duplicates_removed} duplicate report(s)`, 'success');
                 loadReports();
             } catch (e) {
                 showToast('Cleanup failed: ' + e.message, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="flex items-center gap-1.5"><i data-lucide="trash-2" style="width:14px;height:14px;"></i> Cleanup Duplicates</span>'; lucide.createIcons({ nodes: [btn] }); }
             }
         }
 

@@ -18,4 +18,4 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "https://lidoma-kmum.vercel.app,https://cvlyx.github.io,http://localhost:8787,http://127.0.0.1:8787"
