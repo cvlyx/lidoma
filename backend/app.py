@@ -915,13 +915,6 @@ def list_reports(
     """List all reports with live stats via a single aggregated query"""
     from sqlalchemy import Float, cast
 
-    # Subquery: keep only the canonical (lowest id) report per student/term/year
-    canonical_ids = (
-        select(func.min(SchoolReport.id).label("min_id"))
-        .group_by(SchoolReport.student_id, SchoolReport.term, SchoolReport.academic_year)
-        .subquery()
-    )
-
     # Subquery: aggregate grade_records per student/term/year
     grade_agg = (
         select(
@@ -935,9 +928,24 @@ def list_reports(
         .subquery()
     )
 
+    # When no term/year filter: show only one report per student (highest id = most recent)
+    # When term/year filter applied: show one report per student/term/year (lowest id = canonical)
+    if not term and not academic_year:
+        canonical_ids = (
+            select(func.max(SchoolReport.id).label("id"))
+            .group_by(SchoolReport.student_id)
+            .subquery()
+        )
+    else:
+        canonical_ids = (
+            select(func.min(SchoolReport.id).label("id"))
+            .group_by(SchoolReport.student_id, SchoolReport.term, SchoolReport.academic_year)
+            .subquery()
+        )
+
     q = (
         select(SchoolReport, grade_agg)
-        .where(SchoolReport.id.in_(select(canonical_ids.c.min_id)))
+        .where(SchoolReport.id.in_(select(canonical_ids.c.id)))
         .outerjoin(
             grade_agg,
             (SchoolReport.student_id == grade_agg.c.sid)
@@ -1205,10 +1213,13 @@ def cleanup_duplicate_reports(
     """
     Full cleanup:
     1. Delete duplicate school_reports (same student/term/year) keeping lowest id
-    2. Re-sync every remaining report from live grade_records
-    3. Delete reports that have zero subjects after sync
+    2. Delete extra reports for same student keeping only the one with most subjects
+    3. Re-sync every remaining report from live grade_records
+    4. Delete reports that have zero subjects after sync
     """
-    # Step 1: find and delete duplicate reports, keep lowest id
+    cleaned = 0
+
+    # Step 1: remove exact duplicates (same student/term/year), keep lowest id
     dupes = db.execute(
         select(
             SchoolReport.student_id,
@@ -1219,8 +1230,6 @@ def cleanup_duplicate_reports(
         .having(func.count(SchoolReport.id) > 1)
     ).all()
 
-    cleaned = 0
-    affected = set()
     for row in dupes:
         reports = db.scalars(
             select(SchoolReport)
@@ -1232,16 +1241,36 @@ def cleanup_duplicate_reports(
         for r in reports[1:]:
             db.delete(r)
             cleaned += 1
-        affected.add((row.student_id, row.term, row.academic_year))
     db.commit()
 
-    # Step 2: re-sync ALL reports from live grade_records
+    # Step 2: for students with reports across multiple terms/years,
+    # keep only the report with the most subjects (most recent data)
+    multi = db.execute(
+        select(
+            SchoolReport.student_id,
+            func.count(SchoolReport.id).label("cnt")
+        ).group_by(SchoolReport.student_id)
+        .having(func.count(SchoolReport.id) > 1)
+    ).all()
+
+    for row in multi:
+        reports = db.scalars(
+            select(SchoolReport)
+            .where(SchoolReport.student_id == row.student_id)
+            .order_by(SchoolReport.total_subjects.desc(), SchoolReport.id.desc())
+        ).all()
+        for r in reports[1:]:
+            db.delete(r)
+            cleaned += 1
+    db.commit()
+
+    # Step 3: re-sync ALL remaining reports from live grade_records
     all_reports = db.scalars(select(SchoolReport)).all()
     for r in all_reports:
         sync_report(db, r.student_id, r.term, r.academic_year)
     db.commit()
 
-    # Step 3: remove reports with no grade records at all
+    # Step 4: remove reports with no grade records at all
     empty = db.scalars(
         select(SchoolReport).where(SchoolReport.total_subjects == 0)
     ).all()
@@ -1254,7 +1283,66 @@ def cleanup_duplicate_reports(
         "ok": True,
         "duplicates_removed": cleaned,
         "empty_reports_removed": empty_removed,
-        "total_resynced": len(all_reports)
+        "total_resynced": len(all_reports),
+    }
+
+
+@app.get("/api/reports/debug-counts")
+def debug_report_counts(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Show report counts vs student counts per class, and list all duplicate student_ids."""
+    from sqlalchemy import distinct
+
+    # Count students per class
+    student_counts = db.execute(
+        select(Student.student_class, func.count(Student.student_id).label("cnt"))
+        .group_by(Student.student_class)
+    ).all()
+
+    # Count ALL reports per class (raw, no dedup)
+    report_counts_raw = db.execute(
+        select(SchoolReport.student_class, func.count(SchoolReport.id).label("cnt"))
+        .group_by(SchoolReport.student_class)
+    ).all()
+
+    # Count distinct students in reports per class
+    report_distinct = db.execute(
+        select(SchoolReport.student_class, func.count(distinct(SchoolReport.student_id)).label("cnt"))
+        .group_by(SchoolReport.student_class)
+    ).all()
+
+    # Find students with more than one report row (any term/year combo)
+    multi_reports = db.execute(
+        select(
+            SchoolReport.student_id,
+            SchoolReport.student_name,
+            SchoolReport.student_class,
+            func.count(SchoolReport.id).label("cnt"),
+            func.array_agg(SchoolReport.term).label("terms"),
+            func.array_agg(SchoolReport.academic_year).label("years"),
+        )
+        .group_by(SchoolReport.student_id, SchoolReport.student_name, SchoolReport.student_class)
+        .having(func.count(SchoolReport.id) > 1)
+        .order_by(SchoolReport.student_class, SchoolReport.student_name)
+    ).all()
+
+    return {
+        "student_counts": {r.student_class: r.cnt for r in student_counts},
+        "report_counts_raw": {r.student_class: r.cnt for r in report_counts_raw},
+        "report_distinct_students": {r.student_class: r.cnt for r in report_distinct},
+        "students_with_multiple_reports": [
+            {
+                "student_id": r.student_id,
+                "name": r.student_name,
+                "class": r.student_class,
+                "report_count": r.cnt,
+                "terms": r.terms,
+                "years": r.years,
+            }
+            for r in multi_reports
+        ],
     }
 
 
