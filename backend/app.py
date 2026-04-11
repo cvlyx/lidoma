@@ -30,6 +30,40 @@ TERMS = ["First Term", "Second Term", "Third Term"]
 FORM_1_2_CLASSES = {"FORM 1", "FORM 2"}
 
 
+def calc_f34_aggregate(records: list, student_class: str) -> float:
+    """
+    Form 3 & 4 aggregate: English is compulsory.
+    - If English is missing or failed (grade 9 / points 9), return a high penalty aggregate (99.0) = overall FAIL.
+    - Otherwise: English points + best 5 from remaining subjects = best 6 total.
+    """
+    if not records:
+        return 0.0
+
+    english_rec = next(
+        (r for r in records if r.subject.strip().lower() == "english"),
+        None,
+    )
+
+    if english_rec is None:
+        # English not entered yet — cannot compute a valid aggregate
+        return 0.0
+
+    eng_grade = calc_grade_backend(english_rec.score, student_class)
+    if eng_grade["result"] == "FAIL":
+        # Failed English → overall fail regardless of other subjects
+        return 99.0
+
+    eng_points = eng_grade["points"]
+
+    other_points = sorted(
+        calc_grade_backend(r.score, student_class)["points"]
+        for r in records
+        if r.subject.strip().lower() != "english"
+    )
+    best5 = other_points[:5]
+    return float(eng_points + sum(best5))
+
+
 def calc_grade_backend(score: int, student_class: str) -> dict:
     """Calculate grade based on score and class"""
     is_form1_or_2 = student_class in FORM_1_2_CLASSES
@@ -87,11 +121,7 @@ def sync_report(db: Session, student_id: str, term: str, academic_year: str) -> 
     if is_f12:
         aggregate = avg_score
     else:
-        if records:
-            pts = sorted(g['points'] for g in grades)
-            aggregate = float(sum(pts[:6]))
-        else:
-            aggregate = 0.0
+        aggregate = calc_f34_aggregate(records, student.student_class)
 
     app_settings = _read_settings_cached(db)
     report_data = {
@@ -948,17 +978,31 @@ def list_reports(
             .where(GradeRecord.academic_year.in_(years))
         ).all()
 
-        rec_map: dict[tuple, list[tuple[int, str]]] = defaultdict(list)
+        rec_map: dict[tuple, list[tuple[int, str, str]]] = defaultdict(list)
         for rec in all_f34_records:
-            rec_map[(rec.student_id, rec.term, rec.academic_year)].append((rec.score, rec.student_class))
+            rec_map[(rec.student_id, rec.term, rec.academic_year)].append((rec.score, rec.subject, rec.student_class))
 
         for row in f34_rows:
             r = row.SchoolReport
             key = (r.student_id, r.term, r.academic_year)
             entries = rec_map.get(key, [])
             if entries:
-                pts = sorted([calc_grade_backend(score, cls)['points'] for score, cls in entries])
-                agg_points_map[key] = float(sum(pts[:6]))
+                # entries = list of (score, subject, student_class)
+                english_entry = next((e for e in entries if e[1].strip().lower() == "english"), None)
+                if english_entry is None:
+                    agg_points_map[key] = 0.0
+                else:
+                    eng_grade = calc_grade_backend(english_entry[0], english_entry[2])
+                    if eng_grade["result"] == "FAIL":
+                        agg_points_map[key] = 99.0
+                    else:
+                        eng_pts = eng_grade["points"]
+                        other_pts = sorted(
+                            calc_grade_backend(score, cls)["points"]
+                            for score, subj, cls in entries
+                            if subj.strip().lower() != "english"
+                        )
+                        agg_points_map[key] = float(eng_pts + sum(other_pts[:5]))
             else:
                 agg_points_map[key] = 0.0
 
@@ -1014,11 +1058,7 @@ def get_report(
     if is_form1_or_2:
         aggregate = avg_score
     else:
-        if records:
-            sorted_pts = sorted([calc_grade_backend(rec.score, r.student_class)['points'] for rec in records])
-            aggregate = sum(sorted_pts[:6])
-        else:
-            aggregate = 0.0
+        aggregate = calc_f34_aggregate(records, r.student_class)
 
     settings = _read_settings(db)
     stored = json.loads(r.report_data)
@@ -1146,8 +1186,7 @@ def edit_report(
     if is_f12:
         aggregate = avg_score
     else:
-        pts = sorted([calc_grade_backend(rec.score, r.student_class)['points'] for rec in records])
-        aggregate = float(sum(pts[:6])) if pts else 0.0
+        aggregate = calc_f34_aggregate(records, r.student_class)
 
     fresh_data = json.loads(r.report_data)
     return ReportFull(
@@ -1267,16 +1306,8 @@ def generate_reports(
             aggregate = avg_score
             points = None
         else:
-            # For FORM 3&4: calculate best 6 points
-            if records:
-                grades = [calc_grade_backend(r.score, student_class) for r in records]
-                sorted_points = sorted([g['points'] for g in grades])
-                best6 = sorted_points[:6]
-                aggregate = sum(best6)
-                points = aggregate
-            else:
-                aggregate = 0.0
-                points = 0
+            aggregate = calc_f34_aggregate(records, student_class)
+            points = aggregate
         
         # Prepare report data
         report_data = {

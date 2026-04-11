@@ -463,15 +463,32 @@
 
             // Aggregate & Stats
             if (reportRecords.length > 0) {
-                const grades = reportRecords.map(r => calcGrade(r.score).points);
-                const sortedGrades = [...grades].sort((a, b) => a - b);
-                const best6 = sortedGrades.slice(0, 6);
-                const aggregate = best6.reduce((a, b) => a + b, 0);
-                
+                const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(currentStudent.class);
                 const scores = reportRecords.map(r => r.score);
                 const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-                document.getElementById('aggregate-points').textContent = aggregate;
+                let aggregateDisplay;
+                if (isForm1Or2) {
+                    aggregateDisplay = 'N/A';
+                } else {
+                    const englishRec = reportRecords.find(r => r.subject.trim().toLowerCase() === 'english');
+                    if (!englishRec) {
+                        aggregateDisplay = 'N/A';
+                    } else {
+                        const engGrade = calcGrade(englishRec.score);
+                        if (engGrade.result === 'FAIL') {
+                            aggregateDisplay = 'FAIL (ENG)';
+                        } else {
+                            const otherPts = reportRecords
+                                .filter(r => r.subject.trim().toLowerCase() !== 'english')
+                                .map(r => calcGrade(r.score).points)
+                                .sort((a, b) => a - b);
+                            aggregateDisplay = engGrade.points + otherPts.slice(0, 5).reduce((a, b) => a + b, 0);
+                        }
+                    }
+                }
+
+                document.getElementById('aggregate-points').textContent = aggregateDisplay;
                 document.getElementById('average-score').textContent = avg.toFixed(1) + '%';
             }
 

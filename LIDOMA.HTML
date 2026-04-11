@@ -2017,7 +2017,7 @@
                     <td class="text-center px-4 py-3 text-xs" style="color:#64748b;">${report.term}</td>
                     <td class="text-center px-4 py-3">${subjectsDisplay}</td>
                     <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#eff6ff;color:#2563eb;">${report.average_score.toFixed(1)}%</span></td>
-                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f5f3ff;color:#7c3aed;">${report.aggregate_points.toFixed(1)}</span></td>
+                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="${report.aggregate_points >= 99 ? 'background:#fee2e2;color:#dc2626;' : 'background:#f5f3ff;color:#7c3aed;'}">${report.aggregate_points >= 99 ? 'FAIL (ENG)' : report.aggregate_points.toFixed(1)}</span></td>
                     <td class="text-center px-4 py-3">
                         <div class="flex items-center justify-center gap-2">
                             <button onclick="viewReport(${report.id})" title="View" class="rounded-lg p-1.5 transition-colors" style="background:#eff6ff;color:#2563eb;"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
@@ -2143,7 +2143,8 @@
                 const avgAll = subjects.reduce((a, b) => a + b.score, 0) / (subjects.length || 1);
                 aggregate = 'GRADE ' + calcGrade(Math.round(avgAll), 'FORM 1').grade;
             } else {
-                aggregate = d.aggregate || report.aggregate_points || 0;
+                const rawAgg = d.aggregate || report.aggregate_points || 0;
+                aggregate = rawAgg >= 99 ? 'FAIL (ENG)' : rawAgg;
             }
 
             const isDataURL = logoDataUrl.startsWith('data:');
@@ -3082,10 +3083,22 @@
                 const avgAll = scores.reduce((a, b) => a + b, 0) / scores.length;
                 aggregate = 'GRADE ' + calcGrade(avgAll, student.class).grade;
             } else {
-                // Best 6 Grades Aggregate as sum
-                const sortedPoints = [...points].sort((a, b) => a - b);
-                const best6 = sortedPoints.slice(0, 6);
-                aggregate = best6.reduce((a, b) => a + b, 0);
+                // English compulsory: English points + best 5 others
+                const englishRec = reportRecords.find(r => r.subject.trim().toLowerCase() === 'english');
+                if (!englishRec) {
+                    aggregate = 'N/A';
+                } else {
+                    const engGrade = calcGrade(englishRec.score, student.class);
+                    if (engGrade.result === 'FAIL') {
+                        aggregate = 'FAIL (ENG)';
+                    } else {
+                        const otherPts = reportRecords
+                            .filter(r => r.subject.trim().toLowerCase() !== 'english')
+                            .map(r => calcGrade(r.score, student.class).points)
+                            .sort((a, b) => a - b);
+                        aggregate = engGrade.points + otherPts.slice(0, 5).reduce((a, b) => a + b, 0);
+                    }
+                }
             }
 
             const autoComment = (res) => {
