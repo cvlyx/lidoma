@@ -653,6 +653,14 @@
                         </span>
                     </h2>
                     <div class="flex items-center gap-3">
+                        <button onclick="resyncAllReports()" id="btn-resync-reports"
+                            class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
+                            style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                                Resync Reports
+                            </span>
+                        </button>
                         <button onclick="cleanupDuplicateReports()" 
                             class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
                             style="background:#fef3c7;color:#d97706;border:1px solid #fde68a;">
@@ -2498,6 +2506,20 @@
                 errorEl.classList.remove('hidden');
             } finally {
                 btn.disabled = false; btn.textContent = 'Save Changes';
+            }
+        }
+
+        async function resyncAllReports() {
+            const btn = document.getElementById('btn-resync-reports');
+            if (btn) { btn.disabled = true; btn.textContent = 'Syncing...'; }
+            try {
+                const res = await apiRequest('/api/admin/resync-reports', { method: 'POST' });
+                showToast(`Resynced ${res.resynced} reports successfully`, 'success');
+                loadReports();
+            } catch (e) {
+                showToast('Resync failed: ' + e.message, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="flex items-center gap-2"><i data-lucide="refresh-cw" style="width:16px;height:16px;"></i> Resync Reports</span>'; lucide.createIcons({ nodes: [btn] }); }
             }
         }
 

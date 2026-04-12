@@ -383,14 +383,40 @@ def _startup():
             )
             db.commit()
 
-        # Resync only reports that show 0 subjects — these are stale/mismatched reports
-        empty_reports = db.scalars(
-            select(SchoolReport).where(SchoolReport.total_subjects == 0)
+        # Resync reports that have 0 subjects or wrong term — always sync against 'Second Term'
+        stale_reports = db.scalars(
+            select(SchoolReport).where(
+                (SchoolReport.total_subjects == 0) | (SchoolReport.term != 'Second Term')
+            )
         ).all()
-        for r in empty_reports:
-            sync_report(db, r.student_id, r.term, r.academic_year)
-        if empty_reports:
+        for r in stale_reports:
+            # Fix the term on the report row first
+            r.term = 'Second Term'
+        if stale_reports:
             db.commit()
+        # Now resync each one against the actual grade_records
+        for r in stale_reports:
+            sync_report(db, r.student_id, 'Second Term', r.academic_year)
+        if stale_reports:
+            db.commit()
+
+        # Also create missing reports for students who have grades but no report row
+        students_with_grades = db.execute(
+            select(
+                GradeRecord.student_id,
+                GradeRecord.academic_year
+            ).distinct()
+        ).all()
+        for row in students_with_grades:
+            existing = db.scalar(
+                select(SchoolReport)
+                .where(SchoolReport.student_id == row.student_id)
+                .where(SchoolReport.term == 'Second Term')
+                .where(SchoolReport.academic_year == row.academic_year)
+            )
+            if not existing:
+                sync_report(db, row.student_id, 'Second Term', row.academic_year)
+        db.commit()
 
     finally:
         db.close()
@@ -783,6 +809,29 @@ def upsert_settings(
     db.commit()
     _invalidate_settings_cache()
     return _read_settings(db)
+
+
+@app.post("/api/admin/resync-reports")
+def resync_all_reports(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Force-resync all school reports from live grade_records. Fixes missing/stale reports."""
+    # Fix any reports with wrong term
+    stale = db.scalars(select(SchoolReport).where(SchoolReport.term != 'Second Term')).all()
+    for r in stale:
+        r.term = 'Second Term'
+    if stale:
+        db.commit()
+
+    # Resync every student who has grade records
+    rows = db.execute(select(GradeRecord.student_id, GradeRecord.academic_year).distinct()).all()
+    count = 0
+    for row in rows:
+        sync_report(db, row.student_id, 'Second Term', row.academic_year)
+        count += 1
+    db.commit()
+    return {"ok": True, "resynced": count}
 
 
 @app.post("/api/admin/logo")
