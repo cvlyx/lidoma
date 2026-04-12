@@ -370,8 +370,7 @@ def _startup():
     init_db()
     db = SessionLocal()
     try:
-        # Ensure admin user exists — that's all we do on startup now.
-        # Heavy dedup/migration work is handled once in _apply_migrations (db.py).
+        # Ensure admin user exists
         existing = db.scalar(select(User).where(User.username == settings.admin_username))
         if not existing:
             db.add(
@@ -383,6 +382,16 @@ def _startup():
                 )
             )
             db.commit()
+
+        # Resync only reports that show 0 subjects — these are stale/mismatched reports
+        empty_reports = db.scalars(
+            select(SchoolReport).where(SchoolReport.total_subjects == 0)
+        ).all()
+        for r in empty_reports:
+            sync_report(db, r.student_id, r.term, r.academic_year)
+        if empty_reports:
+            db.commit()
+
     finally:
         db.close()
 
