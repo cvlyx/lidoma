@@ -2575,6 +2575,7 @@
             document.getElementById('report-student-select').value = selectedStudentId;
             updateSelectedStudentUI();
             currentFilter = selectedStudentId || 'all';
+            _tablePage = 0;
             // Lazy-load this student's records if not already present
             if (selectedStudentId && !allRecords.some(r => r.student_id === selectedStudentId)) {
                 try {
@@ -2617,6 +2618,7 @@
         // ========== FILTER LOGIC ==========
         document.getElementById('filter-student').addEventListener('change', (e) => {
             currentFilter = e.target.value;
+            _tablePage = 0;
             renderAll();
             // Refresh report and analytics if they are visible
             if (!document.getElementById('tab-report').classList.contains('hidden')) {
@@ -2936,27 +2938,36 @@
         function updateStudentFilterOptions() {
             const filter = document.getElementById('filter-student');
             if (!filter) return;
-            const students = [...new Set(allRecords.map(r => r.student_id))].sort();
+            // Build a map once — O(n) not O(n²)
+            const seen = new Map();
+            allRecords.forEach(r => { if (!seen.has(r.student_id)) seen.set(r.student_id, r.student_name); });
             const currentVal = filter.value;
-            filter.innerHTML = '<option value="all">All Students</option>';
-            students.forEach(id => {
-                const rec = allRecords.find(r => r.student_id === id);
+            const frag = document.createDocumentFragment();
+            const all = document.createElement('option');
+            all.value = 'all'; all.textContent = 'All Students';
+            frag.appendChild(all);
+            [...seen.entries()].sort((a,b) => a[1].localeCompare(b[1])).forEach(([id, name]) => {
                 const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = `${rec.student_name} (${id})`;
-                filter.appendChild(opt);
+                opt.value = id; opt.textContent = `${name} (${id})`;
+                frag.appendChild(opt);
             });
+            filter.innerHTML = '';
+            filter.appendChild(frag);
             if ([...filter.options].some(o => o.value === currentVal)) filter.value = currentVal;
         }
 
+        // Inline SVG icons — avoids lucide.createIcons() per row (very slow)
+        const ICON_PENCIL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        const ICON_TRASH = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+
+        // ===== VIRTUAL TABLE — only renders visible rows =====
+        const PAGE_SIZE = 60; // rows per page
+        let _tablePage = 0;
+
         function renderAll() {
-            // Batch rapid calls — only render once per animation frame
             if (renderAll._pending) return;
             renderAll._pending = true;
-            requestAnimationFrame(() => {
-                renderAll._pending = false;
-                _doRenderAll();
-            });
+            requestAnimationFrame(() => { renderAll._pending = false; _doRenderAll(); });
         }
         renderAll._pending = false;
 
@@ -2975,6 +2986,7 @@
                 empty.classList.remove('hidden');
                 summary.classList.add('hidden');
                 countBadge.textContent = '0 subjects';
+                _removePagination();
                 return;
             }
 
@@ -2982,79 +2994,59 @@
             summary.classList.remove('hidden');
             countBadge.textContent = `${filteredRecords.length} subject${filteredRecords.length !== 1 ? 's' : ''}`;
 
-            // Selective DOM update
-            const existingRows = new Map([...tbody.querySelectorAll('tr[data-rid]')].map(r => [Number(r.dataset.rid), r]));
-            const currentIds = new Set();
+            // Clamp page
+            const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE);
+            if (_tablePage >= totalPages) _tablePage = totalPages - 1;
+            const pageRecs = filteredRecords.slice(_tablePage * PAGE_SIZE, (_tablePage + 1) * PAGE_SIZE);
 
-            filteredRecords.forEach((rec, i) => {
-                const rid = rec.__backendId;
-                currentIds.add(rid);
+            // Build all rows into a fragment — single DOM write
+            const frag = document.createDocumentFragment();
+            pageRecs.forEach(rec => {
                 const g = calcGrade(rec.score, rec.student_class);
-
-                if (existingRows.has(rid)) {
-                    const row = existingRows.get(rid);
-                    const cells = row.querySelectorAll('td');
-                    cells[0].querySelector('.subj-name').textContent = rec.subject;
-                    cells[0].querySelector('.stu-info').textContent = currentFilter === 'all' ? `${rec.student_name} (${rec.student_id})` : '';
-                    cells[1].textContent = rec.score;
-                    cells[2].querySelector('span').textContent = g.grade;
-                    cells[3].textContent = ['FORM 1', 'FORM 2'].includes(rec.student_class) ? 'GRADE ' + g.grade : g.points.toFixed(1);
-                    const badge = cells[4].querySelector('span');
-                    badge.textContent = g.result;
-                    badge.style.background = resultBg(g.result);
-                    badge.style.color = resultColor(g.result);
-                    cells[5].querySelector('span').textContent = rec.term || '—';
-                    cells[6].querySelector('span').textContent = rec.teacher_comment || '—';
-                } else {
-                    const row = document.createElement('tr');
-                    row.dataset.rid = rid;
-                    row.style.borderTop = '1px solid #f1f5f9';
-                    row.innerHTML = `
-        <td class="px-6 py-3">
-            <div class="font-medium" style="color:#1e293b;"><span class="subj-name">${rec.subject}</span></div>
-            <div class="text-[10px] text-slate-400 stu-info">${currentFilter === 'all' ? `${rec.student_name} (${rec.student_id})` : ''}</div>
-        </td>
-        <td class="text-center px-4 py-3" style="color:#1e293b;font-weight:600;">${rec.score}</td>
-        <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f1f5f9;color:#1e293b;">${g.grade}</span></td>
-        <td class="text-center px-4 py-3" style="color:#1e293b;">${['FORM 1', 'FORM 2'].includes(rec.student_class) ? 'GRADE ' + g.grade : g.points.toFixed(1)}</td>
-        <td class="text-center px-4 py-3"><span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.result}</span></td>
-        <td class="px-4 py-3"><span class="text-xs font-medium px-2 py-0.5 rounded" style="background:#f1f5f9;color:#475569;">${rec.term || '—'}</span></td>
-        <td class="px-4 py-3"><span class="text-sm" style="color:#64748b;">${rec.teacher_comment || '—'}</span></td>
-        <td class="text-center px-4 py-3">
-            <div class="flex items-center justify-center gap-2">
-                <button class="edit-grade-btn rounded-lg p-1.5 transition-colors" style="color:#2563eb;background:#eff6ff;" data-rid="${rid}" title="Edit Grade">
-                    <i data-lucide="pencil" style="width:14px;height:14px;"></i>
-                </button>
-                <button class="del-btn rounded-lg p-1.5 transition-colors" style="color:#dc2626;background:#fef2f2;" data-rid="${rid}" title="Delete">
-                    <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-                </button>
-            </div>
-        </td>
-      `;
-                    tbody.appendChild(row);
-                    lucide.createIcons({ nodes: [row] });
-                }
+                const rid = rec.__backendId;
+                const tr = document.createElement('tr');
+                tr.dataset.rid = rid;
+                tr.style.borderTop = '1px solid #f1f5f9';
+                const isF12 = ['FORM 1','FORM 2'].includes(rec.student_class);
+                tr.innerHTML = `
+<td class="px-6 py-3">
+  <div class="font-medium" style="color:#1e293b;">${rec.subject}</div>
+  ${currentFilter==='all'?`<div class="text-[10px] text-slate-400">${rec.student_name} (${rec.student_id})</div>`:''}
+</td>
+<td class="text-center px-4 py-3" style="color:#1e293b;font-weight:600;">${rec.score}</td>
+<td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f1f5f9;color:#1e293b;">${g.grade}</span></td>
+<td class="text-center px-4 py-3" style="color:#1e293b;">${isF12?'GRADE '+g.grade:g.points.toFixed(1)}</td>
+<td class="text-center px-4 py-3"><span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background:${resultBg(g.result)};color:${resultColor(g.result)};">${g.result}</span></td>
+<td class="px-4 py-3"><span class="text-xs font-medium px-2 py-0.5 rounded" style="background:#f1f5f9;color:#475569;">${rec.term||'—'}</span></td>
+<td class="px-4 py-3 text-sm" style="color:#64748b;">${rec.teacher_comment||'—'}</td>
+<td class="text-center px-4 py-3">
+  <div class="flex items-center justify-center gap-2">
+    <button class="edit-grade-btn rounded-lg p-1.5" style="color:#2563eb;background:#eff6ff;" data-rid="${rid}" title="Edit">${ICON_PENCIL}</button>
+    <button class="del-btn rounded-lg p-1.5" style="color:#dc2626;background:#fef2f2;" data-rid="${rid}" title="Delete">${ICON_TRASH}</button>
+  </div>
+</td>`;
+                frag.appendChild(tr);
             });
 
-            existingRows.forEach((row, rid) => { if (!currentIds.has(rid)) row.remove(); });
+            tbody.innerHTML = '';
+            tbody.appendChild(frag);
 
-            // Attach delete handlers
-            tbody.querySelectorAll('.del-btn').forEach(btn => {
-                btn.onclick = () => {
-                    const rid = Number(btn.dataset.rid);
+            // Event delegation — one listener on tbody instead of per-button
+            tbody.onclick = (e) => {
+                const editBtn = e.target.closest('.edit-grade-btn');
+                const delBtn = e.target.closest('.del-btn');
+                if (editBtn) openEditGradeModal(Number(editBtn.dataset.rid));
+                if (delBtn) {
+                    const rid = Number(delBtn.dataset.rid);
                     deleteTarget = allRecords.find(r => r.__backendId === rid);
                     if (deleteTarget) document.getElementById('delete-overlay').classList.remove('hidden');
-                };
-            });
+                }
+            };
 
-            // Attach edit handlers
-            tbody.querySelectorAll('.edit-grade-btn').forEach(btn => {
-                btn.onclick = () => {
-                    openEditGradeModal(Number(btn.dataset.rid));
-                };
-            });
+            // Pagination controls
+            _renderPagination(filteredRecords.length, totalPages);
 
-            // Summary
+            // Summary (use full filteredRecords for accurate stats)
             const scores = filteredRecords.map(r => r.score);
             const points = filteredRecords.map(r => calcGrade(r.score, r.student_class).points);
             const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -3092,6 +3084,34 @@
                 orEl.textContent = or;
                 orEl.style.color = gpa >= 3.0 ? '#059669' : gpa >= 2.0 ? '#d97706' : '#dc2626';
             }
+        }
+
+        function _renderPagination(total, totalPages) {
+            let pg = document.getElementById('table-pagination');
+            if (totalPages <= 1) { if (pg) pg.remove(); return; }
+            if (!pg) {
+                pg = document.createElement('div');
+                pg.id = 'table-pagination';
+                pg.className = 'flex items-center justify-between px-6 py-3 border-t border-slate-100';
+                pg.style.background = '#f8fafc';
+                document.getElementById('grades-tbody').closest('table').parentElement.after(pg);
+            }
+            const start = _tablePage * PAGE_SIZE + 1;
+            const end = Math.min((_tablePage + 1) * PAGE_SIZE, total);
+            pg.innerHTML = `
+                <span class="text-xs text-slate-500">Showing ${start}–${end} of ${total}</span>
+                <div class="flex gap-2">
+                    <button id="pg-prev" class="px-3 py-1 rounded text-xs font-semibold border border-slate-200 ${_tablePage===0?'opacity-40 cursor-not-allowed':''}" ${_tablePage===0?'disabled':''} style="background:#fff;color:#4f46e5;">← Prev</button>
+                    <span class="px-3 py-1 text-xs font-semibold" style="color:#64748b;">Page ${_tablePage+1} / ${totalPages}</span>
+                    <button id="pg-next" class="px-3 py-1 rounded text-xs font-semibold border border-slate-200 ${_tablePage>=totalPages-1?'opacity-40 cursor-not-allowed':''}" ${_tablePage>=totalPages-1?'disabled':''} style="background:#fff;color:#4f46e5;">Next →</button>
+                </div>`;
+            document.getElementById('pg-prev').onclick = () => { if (_tablePage > 0) { _tablePage--; renderAll(); } };
+            document.getElementById('pg-next').onclick = () => { if (_tablePage < totalPages-1) { _tablePage++; renderAll(); } };
+        }
+
+        function _removePagination() {
+            const pg = document.getElementById('table-pagination');
+            if (pg) pg.remove();
         }
 
         // ========== BUILD REPORT ==========
@@ -3287,6 +3307,7 @@
         }
 
         // ========== BUILD ANALYTICS ==========
+        let _analyticsHash = null;
         function buildAnalytics() {
             const c = document.getElementById('analytics-content');
             const cAlt = document.getElementById('analytics-content-alt');
@@ -3294,6 +3315,11 @@
             const analyticRecords = currentFilter === 'all'
                 ? allRecords
                 : allRecords.filter(r => r.student_id === currentFilter);
+
+            // Skip rebuild if nothing changed
+            const hash = `${currentFilter}:${analyticRecords.length}:${analyticRecords.map(r=>r.score).join(',')}`;
+            if (hash === _analyticsHash) return;
+            _analyticsHash = hash;
 
             if (analyticRecords.length === 0) {
                 const emptyMsg = `<div class="flex flex-col items-center justify-center py-20 gap-3">
