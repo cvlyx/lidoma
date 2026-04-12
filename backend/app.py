@@ -407,8 +407,6 @@ def init_data(
     q = select(GradeRecord).order_by(GradeRecord.created_at.desc())
     if student_id:
         q = q.where(GradeRecord.student_id == student_id)
-    else:
-        q = q.limit(1000)
     records = db.scalars(q).all()
 
     cfg = _read_settings_cached(db)
