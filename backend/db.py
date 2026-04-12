@@ -144,3 +144,26 @@ def _apply_migrations() -> None:
         except Exception as e:
             conn.rollback()
             print(f"Migration warning (students constraint): {e}")
+
+        # 7. Normalise all existing records to 'Second Term'
+        try:
+            result = conn.execute(text(
+                "UPDATE grade_records SET term = 'Second Term' WHERE term != 'Second Term'"
+            ))
+            conn.commit()
+            if result.rowcount:
+                print(f"Migration: updated {result.rowcount} grade_records to 'Second Term'.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Migration warning (grade_records term normalise): {e}")
+
+        try:
+            result = conn.execute(text(
+                "UPDATE school_reports SET term = 'Second Term' WHERE term != 'Second Term'"
+            ))
+            conn.commit()
+            if result.rowcount:
+                print(f"Migration: updated {result.rowcount} school_reports to 'Second Term'.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Migration warning (school_reports term normalise): {e}")

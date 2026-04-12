@@ -719,6 +719,8 @@ def create_record(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
+    # Always enforce Second Term regardless of what was submitted
+    payload.term = "Second Term"
     # Check for duplicate subject for same student/term/year
     existing = db.scalar(
         select(GradeRecord)
@@ -801,8 +803,8 @@ def update_record(
     if not r:
         raise HTTPException(status_code=404, detail="Record not found")
     
-    if payload.term is not None:
-        r.term = payload.term
+    # Always keep term as Second Term — ignore any term change from payload
+    r.term = "Second Term"
     if payload.academic_year is not None:
         r.academic_year = payload.academic_year
     if payload.subject is not None:
