@@ -803,8 +803,8 @@ def update_record(
     if not r:
         raise HTTPException(status_code=404, detail="Record not found")
     
-    # Always keep term as Second Term — ignore any term change from payload
-    r.term = "Second Term"
+    if payload.term is not None:
+        r.term = payload.term
     if payload.academic_year is not None:
         r.academic_year = payload.academic_year
     if payload.subject is not None:

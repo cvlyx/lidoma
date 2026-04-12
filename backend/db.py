@@ -146,6 +146,23 @@ def _apply_migrations() -> None:
             print(f"Migration warning (students constraint): {e}")
 
         # 7. Normalise all existing records to 'Second Term'
+        # First delete any existing 'Second Term' record that would conflict with a Term 1/3 record
+        # for the same student/year/subject (keep the non-Second-Term one, update it to Second Term)
+        try:
+            conn.execute(text("""
+                DELETE FROM grade_records
+                WHERE term = 'Second Term'
+                AND (student_id, academic_year, lower(subject)) IN (
+                    SELECT student_id, academic_year, lower(subject)
+                    FROM grade_records
+                    WHERE term != 'Second Term'
+                )
+            """))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Migration warning (grade_records conflict clear): {e}")
+
         try:
             result = conn.execute(text(
                 "UPDATE grade_records SET term = 'Second Term' WHERE term != 'Second Term'"
@@ -156,6 +173,22 @@ def _apply_migrations() -> None:
         except Exception as e:
             conn.rollback()
             print(f"Migration warning (grade_records term normalise): {e}")
+
+        # Same for school_reports
+        try:
+            conn.execute(text("""
+                DELETE FROM school_reports
+                WHERE term = 'Second Term'
+                AND (student_id, academic_year) IN (
+                    SELECT student_id, academic_year
+                    FROM school_reports
+                    WHERE term != 'Second Term'
+                )
+            """))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Migration warning (school_reports conflict clear): {e}")
 
         try:
             result = conn.execute(text(
