@@ -1120,8 +1120,36 @@
         const API_BASE = 'https://lidoma-backend.onrender.com';
         const TOKEN_KEY = 'lidoma_jwt';
 
-        // Keep-alive ping every 10 minutes to prevent Render free tier cold starts
-        setInterval(() => fetch(API_BASE + '/api/health').catch(() => {}), 10 * 60 * 1000);
+        // Keep-alive ping every 14 minutes to prevent Render free tier cold starts
+        setInterval(() => fetch(API_BASE + '/api/health').catch(() => {}), 14 * 60 * 1000);
+
+        // ========== DEBOUNCED RENDER ==========
+        let _renderTimer = null;
+        function scheduleRender() {
+            renderAll(); // renderAll is already rAF-debounced
+        }
+
+        // ========== LOAD INIT DATA ==========
+        async function loadInitData() {
+            const init = await apiRequest('/api/init');
+            students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
+            allRecords = init.records.map(r => ({
+                __backendId: r.id, student_id: r.student_id, student_name: r.student_name,
+                student_class: r.student_class, term: r.term, academic_year: r.academic_year,
+                subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || ''
+            }));
+            if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
+            if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
+            if (init.settings.report_title) document.getElementById('report-title-display').textContent = init.settings.report_title;
+            if (init.settings.academic_year) {
+                document.getElementById('year-badge').textContent = init.settings.academic_year;
+                document.getElementById('inp-academic-year').value = init.settings.academic_year;
+            }
+            renderStudents();
+            updateEntryStudentSelect();
+            updateStudentFilterOptions();
+            renderAll();
+        }
 
         function getToken() {
             return sessionStorage.getItem(TOKEN_KEY) || '';
@@ -1518,17 +1546,8 @@
                     authBtn.innerHTML = '<span class="spinner"></span> Logging in...';
                     try {
                         await login(userInp.value.trim(), passInp.value);
-                        // After login, load all data in one request
-                        const init = await apiRequest('/api/init');
-                        students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
-                        allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
-                        if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
-                        if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
-                        if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
-                        renderStudents();
-                        updateEntryStudentSelect();
-                        updateStudentFilterOptions();
-                        renderAll();
+                        await loadInitData();
+                        hideAuthOverlay();
                     } catch (e) {
                         authErr.textContent = e.message || 'Login failed';
                         authErr.classList.remove('hidden');
@@ -1553,16 +1572,7 @@
                 // Only load data if already authenticated
                 if (getToken()) {
                     try {
-                        const init = await apiRequest('/api/init');
-                        students = init.students.map(s => ({ id: s.student_id, name: s.name, class: s.student_class }));
-                        allRecords = init.records.map(r => ({ __backendId: r.id, student_id: r.student_id, student_name: r.student_name, student_class: r.student_class, term: r.term, academic_year: r.academic_year, subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || '' }));
-                        if (init.logo_data_url) { logoDataURL = init.logo_data_url; document.getElementById('school-logo-main').src = logoDataURL; }
-                        if (init.settings.school_name) document.getElementById('school-name-display').textContent = init.settings.school_name;
-                        if (init.settings.academic_year) { document.getElementById('year-badge').textContent = init.settings.academic_year; document.getElementById('inp-academic-year').value = init.settings.academic_year; }
-                        renderStudents();
-                        updateEntryStudentSelect();
-                        updateStudentFilterOptions();
-                        renderAll();
+                        await loadInitData();
                     } catch (e) {
                         // Token expired or invalid — show login
                         setToken(null);
@@ -1583,7 +1593,7 @@
                                     allRecords = data;
                                     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                                     updateStudentFilterOptions();
-                                    renderAll();
+                                    scheduleRender();
                                 }
                             }
                         }
@@ -1593,7 +1603,7 @@
                 }
             }
             
-            renderAll();
+            // No extra renderAll() here — loadInitData already renders
         })();
 
         // ========== SETTINGS LOGIC ==========
@@ -2560,11 +2570,24 @@
             updateSelectedStudentUI();
         });
 
-        document.getElementById('inp-student-select').addEventListener('change', (e) => {
+        document.getElementById('inp-student-select').addEventListener('change', async (e) => {
             selectedStudentId = e.target.value;
             document.getElementById('report-student-select').value = selectedStudentId;
             updateSelectedStudentUI();
             currentFilter = selectedStudentId || 'all';
+            // Lazy-load this student's records if not already present
+            if (selectedStudentId && !allRecords.some(r => r.student_id === selectedStudentId)) {
+                try {
+                    const data = await apiRequest(`/api/init?student_id=${encodeURIComponent(selectedStudentId)}`);
+                    const newRecs = data.records.map(r => ({
+                        __backendId: r.id, student_id: r.student_id, student_name: r.student_name,
+                        student_class: r.student_class, term: r.term, academic_year: r.academic_year,
+                        subject: r.subject, score: r.score, teacher_comment: r.teacher_comment || ''
+                    }));
+                    allRecords = [...allRecords.filter(r => r.student_id !== selectedStudentId), ...newRecs];
+                    updateStudentFilterOptions();
+                } catch(err) { console.warn('Failed to load student records', err); }
+            }
             renderAll();
         });
 
@@ -2927,6 +2950,17 @@
         }
 
         function renderAll() {
+            // Batch rapid calls — only render once per animation frame
+            if (renderAll._pending) return;
+            renderAll._pending = true;
+            requestAnimationFrame(() => {
+                renderAll._pending = false;
+                _doRenderAll();
+            });
+        }
+        renderAll._pending = false;
+
+        function _doRenderAll() {
             const tbody = document.getElementById('grades-tbody');
             const empty = document.getElementById('empty-state');
             const summary = document.getElementById('summary-row');

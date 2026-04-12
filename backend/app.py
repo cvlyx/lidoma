@@ -370,7 +370,8 @@ def _startup():
     init_db()
     db = SessionLocal()
     try:
-        # Ensure admin user exists
+        # Ensure admin user exists — that's all we do on startup now.
+        # Heavy dedup/migration work is handled once in _apply_migrations (db.py).
         existing = db.scalar(select(User).where(User.username == settings.admin_username))
         if not existing:
             db.add(
@@ -381,97 +382,6 @@ def _startup():
                     is_active=True,
                 )
             )
-            db.commit()
-
-        # Deduplicate school_reports — keep only the lowest id per student/term/year, delete the rest
-        dupes = db.execute(
-            select(
-                SchoolReport.student_id,
-                SchoolReport.term,
-                SchoolReport.academic_year,
-                func.count(SchoolReport.id).label("cnt")
-            ).group_by(
-                SchoolReport.student_id,
-                SchoolReport.term,
-                SchoolReport.academic_year
-            ).having(func.count(SchoolReport.id) > 1)
-        ).all()
-
-        for row in dupes:
-            reports = db.scalars(
-                select(SchoolReport)
-                .where(SchoolReport.student_id == row.student_id)
-                .where(SchoolReport.term == row.term)
-                .where(SchoolReport.academic_year == row.academic_year)
-                .order_by(SchoolReport.id.asc())
-            ).all()
-            for r in reports[1:]:
-                db.delete(r)
-        if dupes:
-            db.commit()
-        # Re-sync the canonical reports after dedup
-        for row in dupes:
-            sync_report(db, row.student_id, row.term, row.academic_year)
-        if dupes:
-            db.commit()
-
-        # Re-sync ALL reports so subjects are always up to date
-        all_reports = db.scalars(select(SchoolReport)).all()
-        for r in all_reports:
-            sync_report(db, r.student_id, r.term, r.academic_year)
-        db.commit()
-
-        # Deduplicate grade_records — keep only the latest per student/term/year/subject
-        grade_dupes = db.execute(
-            select(
-                GradeRecord.student_id,
-                GradeRecord.term,
-                GradeRecord.academic_year,
-                func.lower(GradeRecord.subject).label("subj"),
-                func.count(GradeRecord.id).label("cnt")
-            ).group_by(
-                GradeRecord.student_id,
-                GradeRecord.term,
-                GradeRecord.academic_year,
-                func.lower(GradeRecord.subject)
-            ).having(func.count(GradeRecord.id) > 1)
-        ).all()
-
-        for row in grade_dupes:
-            recs = db.scalars(
-                select(GradeRecord)
-                .where(GradeRecord.student_id == row.student_id)
-                .where(GradeRecord.term == row.term)
-                .where(GradeRecord.academic_year == row.academic_year)
-                .where(func.lower(GradeRecord.subject) == row.subj)
-                .order_by(GradeRecord.id.desc())
-            ).all()
-            for r in recs[1:]:
-                db.delete(r)
-        if grade_dupes:
-            db.commit()
-
-        # Deduplicate students — same name+class, keep the oldest
-        student_dupes = db.execute(
-            select(
-                Student.name,
-                Student.student_class,
-                func.count(Student.student_id).label("cnt")
-            ).group_by(Student.name, Student.student_class)
-            .having(func.count(Student.student_id) > 1)
-        ).all()
-
-        for row in student_dupes:
-            studs = db.scalars(
-                select(Student)
-                .where(Student.name == row.name)
-                .where(Student.student_class == row.student_class)
-                .order_by(Student.created_at.asc())
-            ).all()
-            for s in studs[1:]:
-                db.execute(delete(GradeRecord).where(GradeRecord.student_id == s.student_id))
-                db.delete(s)
-        if student_dupes:
             db.commit()
     finally:
         db.close()
@@ -486,10 +396,21 @@ def health():
 def init_data(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    student_id: str | None = None,
 ):
-    """Single endpoint to load all startup data in one round-trip."""
+    """Single endpoint to load all startup data in one round-trip.
+    Pass ?student_id=X to load records for a specific student only.
+    Without student_id, returns all students but only the 300 most recent records.
+    """
     students = db.scalars(select(Student).order_by(Student.created_at.desc())).all()
-    records = db.scalars(select(GradeRecord).order_by(GradeRecord.created_at.desc())).all()
+
+    q = select(GradeRecord).order_by(GradeRecord.created_at.desc())
+    if student_id:
+        q = q.where(GradeRecord.student_id == student_id)
+    else:
+        q = q.limit(1000)
+    records = db.scalars(q).all()
+
     cfg = _read_settings_cached(db)
     logo = db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
     return {
