@@ -146,57 +146,39 @@ def _apply_migrations() -> None:
             print(f"Migration warning (students constraint): {e}")
 
         # 7. Normalise all existing records to 'Second Term'
-        # First delete any existing 'Second Term' record that would conflict with a Term 1/3 record
-        # for the same student/year/subject (keep the non-Second-Term one, update it to Second Term)
+        # Simply update term 1/3 records — no deletions needed.
+        # The unique constraint is on (student_id, term, academic_year, subject).
+        # Changing term from 'First Term'/'Third Term' to 'Second Term' only conflicts
+        # if an identical Second Term record already exists for that student+year+subject.
+        # In that case we just skip those rows to avoid losing data.
         try:
             conn.execute(text("""
-                DELETE FROM grade_records
-                WHERE term = 'Second Term'
-                AND (student_id, academic_year, lower(subject)) IN (
+                UPDATE grade_records
+                SET term = 'Second Term'
+                WHERE term != 'Second Term'
+                AND (student_id, academic_year, lower(subject)) NOT IN (
                     SELECT student_id, academic_year, lower(subject)
                     FROM grade_records
-                    WHERE term != 'Second Term'
+                    WHERE term = 'Second Term'
                 )
             """))
             conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"Migration warning (grade_records conflict clear): {e}")
-
-        try:
-            result = conn.execute(text(
-                "UPDATE grade_records SET term = 'Second Term' WHERE term != 'Second Term'"
-            ))
-            conn.commit()
-            if result.rowcount:
-                print(f"Migration: updated {result.rowcount} grade_records to 'Second Term'.")
         except Exception as e:
             conn.rollback()
             print(f"Migration warning (grade_records term normalise): {e}")
 
-        # Same for school_reports
         try:
             conn.execute(text("""
-                DELETE FROM school_reports
-                WHERE term = 'Second Term'
-                AND (student_id, academic_year) IN (
+                UPDATE school_reports
+                SET term = 'Second Term'
+                WHERE term != 'Second Term'
+                AND (student_id, academic_year) NOT IN (
                     SELECT student_id, academic_year
                     FROM school_reports
-                    WHERE term != 'Second Term'
+                    WHERE term = 'Second Term'
                 )
             """))
             conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"Migration warning (school_reports conflict clear): {e}")
-
-        try:
-            result = conn.execute(text(
-                "UPDATE school_reports SET term = 'Second Term' WHERE term != 'Second Term'"
-            ))
-            conn.commit()
-            if result.rowcount:
-                print(f"Migration: updated {result.rowcount} school_reports to 'Second Term'.")
         except Exception as e:
             conn.rollback()
             print(f"Migration warning (school_reports term normalise): {e}")
