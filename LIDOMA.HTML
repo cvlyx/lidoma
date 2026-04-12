@@ -2328,15 +2328,29 @@
             const selectedIds = Array.from(document.querySelectorAll('.report-checkbox:checked')).map(cb => parseInt(cb.dataset.reportId));
             if (selectedIds.length === 0) return;
 
-            showToast(`Generating ${selectedIds.length} PDF(s)...`, 'success');
+            const btn = document.getElementById('btn-download-selected');
+            if (btn) btn.disabled = true;
+            showToast(`Starting: 0 / ${selectedIds.length} PDFs...`, 'success');
+
             try {
                 const zip = new JSZip();
+                let done = 0;
                 for (const id of selectedIds) {
-                    const report = await apiRequest(`/api/reports/${id}`);
-                    const blob = await generateReportPdfBlob(report);
-                    const pos = report.position ? `${report.position}_` : '';
-                    zip.file(`${pos}${report.student_name}_${report.term}_${report.academic_year}.pdf`, blob);
+                    try {
+                        const report = await apiRequest(`/api/reports/${id}`);
+                        const blob = await generateReportPdfBlob(report);
+                        const pos = report.position ? `${report.position}_` : '';
+                        zip.file(`${pos}${report.student_name}.pdf`, blob);
+                        done++;
+                        if (done % 3 === 0 || done === selectedIds.length) {
+                            showToast(`Generating PDFs: ${done} / ${selectedIds.length}...`, 'success');
+                        }
+                    } catch (err) {
+                        console.warn(`Skipped report ${id}:`, err.message);
+                    }
                 }
+                if (done === 0) { showToast('No PDFs could be generated', 'error'); return; }
+                showToast('Compressing ZIP...', 'success');
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(zipBlob);
                 const a = document.createElement('a');
@@ -2346,40 +2360,69 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                showToast('Download ready!', 'success');
+                showToast(`Downloaded ${done} report(s)!`, 'success');
             } catch (error) {
                 showToast('Failed to download: ' + error.message, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; updateSelectedCount(); }
             }
         }
 
         async function downloadClassReports(className) {
-            const term = document.getElementById('filter-term').value;
-            if (!term) { showToast('Please select a term filter first', 'warning'); return; }
+            const termFilter = document.getElementById('filter-term').value;
+            const yearFilter = document.getElementById('filter-year') ? document.getElementById('filter-year').value : '';
 
-            const classReports = allReports.filter(r => r.student_class === className && r.term === term);
-            if (classReports.length === 0) { showToast('No reports found for this class/term', 'warning'); return; }
+            let classReports = allReports.filter(r => r.student_class === className);
+            if (termFilter) classReports = classReports.filter(r => r.term === termFilter);
+            if (yearFilter) classReports = classReports.filter(r => r.academic_year === yearFilter);
+            // Only include reports that actually have grades
+            classReports = classReports.filter(r => r.total_subjects > 0);
 
-            showToast(`Generating ${classReports.length} PDF(s)...`, 'success');
+            if (classReports.length === 0) {
+                showToast('No reports with grades found for this class', 'warning');
+                return;
+            }
+
+            const btn = document.querySelector(`button[onclick="event.stopPropagation(); downloadClassReports('${className}')"]`);
+            if (btn) { btn.disabled = true; }
+
             try {
                 const zip = new JSZip();
+                let done = 0;
+                showToast(`Starting download: 0 / ${classReports.length} PDFs...`, 'success');
+
                 for (const summary of classReports) {
-                    const report = await apiRequest(`/api/reports/${summary.id}`);
-                    const blob = await generateReportPdfBlob(report);
-                    const pos = report.position ? `${report.position}_` : '';
-                    zip.file(`${pos}${report.student_name}_${report.term}_${report.academic_year}.pdf`, blob);
+                    try {
+                        const report = await apiRequest(`/api/reports/${summary.id}`);
+                        const blob = await generateReportPdfBlob(report);
+                        const pos = report.position ? `${report.position}_` : '';
+                        zip.file(`${pos}${report.student_name}.pdf`, blob);
+                        done++;
+                        if (done % 3 === 0 || done === classReports.length) {
+                            showToast(`Generating PDFs: ${done} / ${classReports.length}...`, 'success');
+                        }
+                    } catch (err) {
+                        console.warn(`Skipped ${summary.student_name}:`, err.message);
+                    }
                 }
+
+                if (done === 0) { showToast('No PDFs could be generated', 'error'); return; }
+
+                showToast('Compressing ZIP...', 'success');
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(zipBlob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${className}_${term}_Reports.zip`;
+                a.download = `${className}_Reports.zip`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                showToast('Download ready!', 'success');
+                showToast(`Downloaded ${done} report(s) successfully!`, 'success');
             } catch (error) {
-                showToast('Failed to download: ' + error.message, 'error');
+                showToast('Download failed: ' + error.message, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; }
             }
         }
 
