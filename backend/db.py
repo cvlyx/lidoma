@@ -13,15 +13,23 @@ if not settings.database_url:
         "DATABASE_URL is missing. Create backend/.env (copy from backend/.env.example) and set DATABASE_URL."
     )
 
-engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    poolclass=QueuePool,
-    pool_size=2,
-    max_overflow=3,
-    pool_timeout=30,
-    connect_args={"connect_timeout": 10},
-)
+# Use SQLite-specific configuration for SQLite databases
+if settings.database_url.startswith("sqlite"):
+    engine = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        poolclass=QueuePool,
+        pool_size=2,
+        max_overflow=3,
+        pool_timeout=30,
+        connect_args={"connect_timeout": 10},
+    )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

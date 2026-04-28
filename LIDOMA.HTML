@@ -5,10 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <title>LIDOMA - School Exam Report Analyzer</title>
-    <!-- Note: cdn.tailwindcss.com is used for standalone local development convenience. 
+    <!-- Note: cdn.tailwindcss.com is used for standalone local development convenience.
          For a formal production environment, Tailwind should be installed via PostCSS/CLI. -->
     <script>
         // Suppress Tailwind CDN production warning in console
@@ -112,28 +113,28 @@
             body {
                 font-size: 14px;
             }
-            
+
             /* Better touch targets */
             button, a, input, select {
                 min-height: 44px;
             }
-            
+
             /* Smooth scrolling */
             * {
                 -webkit-overflow-scrolling: touch;
             }
-            
+
             /* Hide scrollbars on mobile for cleaner look */
             ::-webkit-scrollbar {
                 display: none;
             }
-            
+
             /* Mobile-friendly modals */
             .modal-content {
                 max-height: 85vh;
                 overflow-y: auto;
             }
-            
+
             /* Sticky headers on mobile */
             .mobile-sticky {
                 position: sticky;
@@ -142,13 +143,13 @@
                 background: white;
             }
         }
-        
+
         /* Active state for touch */
         button:active, .btn:active {
             transform: scale(0.97);
             transition: transform 0.1s;
         }
-        
+
         /* Improved input focus for mobile */
         input:focus, select:focus, textarea:focus {
             outline: none;
@@ -252,7 +253,7 @@
                 size: A4;
                 margin: 0;
             }
-            body { 
+            body {
                 background: white !important;
                 margin: 0;
                 padding: 0;
@@ -301,7 +302,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <a href="PARENT_PORTAL.HTML" target="_blank" 
+                    <a href="PARENT_PORTAL.HTML" target="_blank"
                         class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-sm"
                         style="background:rgba(255,255,255,0.1);color:#f8fafc;border:1px solid rgba(255,255,255,0.2);">
                         <i data-lucide="external-link" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
@@ -329,6 +330,9 @@
                 <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="reports-archive" style="color:#64748b;">
                     <span class="flex items-center gap-1.5"><i data-lucide="folder-archive"
                             style="width:15px;height:15px;"></i> Reports Archive</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="teacher-access" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="graduation-cap"
+                            style="width:15px;height:15px;"></i> Teacher Access</span> </button>
                 <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="settings" style="color:#64748b;">
                     <span class="flex items-center gap-1.5"><i data-lucide="settings"
                             style="width:15px;height:15px;"></i> Settings</span> </button>
@@ -661,7 +665,7 @@
                                 Resync Reports
                             </span>
                         </button>
-                        <button onclick="cleanupDuplicateReports()" 
+                        <button onclick="cleanupDuplicateReports()"
                             class="rounded-lg px-4 py-2 text-sm font-bold transition-all"
                             style="background:#fef3c7;color:#d97706;border:1px solid #fde68a;">
                             <span class="flex items-center gap-2">
@@ -679,17 +683,17 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- Search and Filters -->
                 <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="md:col-span-2">
-                        <input type="text" id="report-search" placeholder="Search by student name or ID..." 
+                        <input type="text" id="report-search" placeholder="Search by student name or ID..."
                             class="w-full rounded-lg px-4 py-2.5 text-sm"
                             style="border:1px solid #cbd5e1;color:#1e293b;"
                             oninput="debouncedSearch()">
                     </div>
                     <div>
-                        <select id="filter-class" onchange="loadReports()" 
+                        <select id="filter-class" onchange="loadReports()"
                             class="w-full rounded-lg px-3 py-2.5 text-sm"
                             style="border:1px solid #cbd5e1;color:#1e293b;">
                             <option value="">All Classes</option>
@@ -700,7 +704,7 @@
                         </select>
                     </div>
                     <div>
-                        <select id="filter-term" onchange="loadReports()" 
+                        <select id="filter-term" onchange="loadReports()"
                             class="w-full rounded-lg px-3 py-2.5 text-sm"
                             style="border:1px solid #cbd5e1;color:#1e293b;">
                             <option value="">All Terms</option>
@@ -725,6 +729,137 @@
             </div>
         </main>
 
+        <!-- Tab: Teacher Access -->
+        <main id="tab-teacher-access" class="max-w-6xl mx-auto p-6 hidden fade-in">
+            <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <h2 class="font-display text-lg font-bold mb-4" style="color:#1e293b;">
+                    <span class="flex items-center gap-2"><i data-lucide="graduation-cap"
+                            style="width:20px;height:20px;color:#4f46e5;"></i> Teacher Subject Access</span>
+                </h2>
+                <p class="text-sm text-gray-600 mb-6">Access and download results for your specific subject and class</p>
+
+                <!-- Teacher Selection Form -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Class</label>
+                        <select id="teacher-class-select" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">Select Class</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Subject</label>
+                        <select id="teacher-subject-select" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;" disabled>
+                            <option value="">Select Subject</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Select Term</label>
+                        <select id="teacher-term-select" class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="First Term">First Term</option>
+                            <option value="Second Term">Second Term</option>
+                            <option value="Third Term">Third Term</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btn-load-teacher-results" class="rounded-lg px-5 py-2.5 text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                        style="background:#4f46e5;color:#f8fafc;" disabled>
+                        <i data-lucide="search" style="width:16px;height:16px;"></i> Load Results
+                    </button>
+                    <button id="btn-download-teacher-results" class="rounded-lg px-5 py-2.5 text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                        style="background:#10b981;color:#f8fafc;" disabled>
+                        <i data-lucide="download" style="width:16px;height:16px;"></i> Download Results
+                    </button>
+                </div>
+            </section>
+
+            <!-- Results Display Section -->
+            <section id="teacher-results-section" class="hidden rounded-xl overflow-hidden card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="px-6 py-4 flex flex-wrap items-center justify-between gap-4"
+                    style="border-bottom:1px solid #e2e8f0;">
+                    <h3 class="font-display text-lg font-bold" style="color:#1e293b;">
+                        <span id="teacher-results-title">Subject Results</span>
+                    </h3>
+                    <div class="flex items-center gap-3">
+                        <span id="teacher-results-count" class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style="background:#e0e7ff;color:#4f46e5;">0 students</span>
+                        <button id="btn-print-teacher-results" class="text-gray-600 hover:text-gray-900">
+                            <i data-lucide="printer" style="width:18px;height:18px;"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">#</th>
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Student ID</th>
+                                <th class="text-left px-6 py-3 font-semibold" style="color:#64748b;">Name</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Score</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Grade</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Points</th>
+                                <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Result</th>
+                                <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-results-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="teacher-results-empty" class="hidden text-center py-12 px-6">
+                    <i data-lucide="inbox" style="width:48px;height:48px;color:#cbd5e1;margin:0 auto;display:block;"></i>
+                    <p class="mt-3 text-sm" style="color:#94a3b8;">No results found for the selected criteria.</p>
+                </div>
+            </section>
+
+            <!-- Statistics Summary -->
+            <section id="teacher-stats-section" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Students</p>
+                            <p id="teacher-stat-total" class="text-2xl font-bold text-gray-900">0</p>
+                        </div>
+                        <i data-lucide="users" class="w-8 h-8 text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Average Score</p>
+                            <p id="teacher-stat-average" class="text-2xl font-bold text-gray-900">0</p>
+                        </div>
+                        <i data-lucide="trending-up" class="w-8 h-8 text-green-600"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Highest Score</p>
+                            <p id="teacher-stat-highest" class="text-2xl font-bold text-gray-900">0</p>
+                        </div>
+                        <i data-lucide="award" class="w-8 h-8 text-yellow-600"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Pass Rate</p>
+                            <p id="teacher-stat-passrate" class="text-2xl font-bold text-gray-900">0%</p>
+                        </div>
+                        <i data-lucide="check-circle" class="w-8 h-8 text-purple-600"></i>
+                    </div>
+                </div>
+            </section>
+        </main>
+
         <!-- Tab: Settings -->
         <main id="tab-settings" class="max-w-3xl mx-auto p-6 hidden fade-in">
             <section class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
@@ -732,7 +867,7 @@
                     <span class="flex items-center gap-2"><i data-lucide="settings"
                             style="width:20px;height:20px;color:#4f46e5;"></i> System Settings</span>
                 </h2>
-                
+
                 <div class="space-y-6">
                     <!-- School Logo Section -->
                     <div class="p-4 rounded-lg bg-slate-50 border border-slate-200">
@@ -749,7 +884,7 @@
                             </div>
                             <div class="flex-1">
                                 <p class="text-xs text-slate-600 leading-relaxed mb-2">
-                                    <strong>Important:</strong> When running locally (file:// protocol), browser security prevents automatic image loading for PDF generation. 
+                                    <strong>Important:</strong> When running locally (file:// protocol), browser security prevents automatic image loading for PDF generation.
                                 </p>
                                 <p class="text-[11px] text-indigo-600 font-medium">
                                     <i data-lucide="info" class="w-3 h-3 inline mr-1"></i> Please upload your school logo here manually to enable high-quality PDF/Image exports.
@@ -902,7 +1037,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Score (0-100)</label>
-                            <input id="edit-grade-score" type="number" min="0" max="100" 
+                            <input id="edit-grade-score" type="number" min="0" max="100"
                                 class="w-full rounded-lg px-3 py-2.5 text-sm"
                                 style="border:1px solid #cbd5e1;color:#0f172a;">
                         </div>
@@ -919,14 +1054,14 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Academic Year</label>
-                            <input id="edit-grade-year" type="text" 
+                            <input id="edit-grade-year" type="text"
                                 class="w-full rounded-lg px-3 py-2.5 text-sm"
                                 style="border:1px solid #cbd5e1;color:#0f172a;">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Teacher Comment</label>
-                        <input id="edit-grade-comment" type="text" 
+                        <input id="edit-grade-comment" type="text"
                             class="w-full rounded-lg px-3 py-2.5 text-sm"
                             style="border:1px solid #cbd5e1;color:#0f172a;" placeholder="Optional comment">
                     </div>
@@ -999,7 +1134,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold mb-1" style="color:#64748b;">Academic Year</label>
-                        <input id="gen-year" type="text" placeholder="e.g. 2025/2026" 
+                        <input id="gen-year" type="text" placeholder="e.g. 2025/2026"
                             class="w-full rounded-lg px-3 py-2.5 text-sm"
                             style="border:1px solid #cbd5e1;color:#0f172a;">
                     </div>
@@ -1012,7 +1147,7 @@
                     </div>
                     <div id="generate-report-error" class="text-xs hidden" style="color:#dc2626;"></div>
                     <div class="flex gap-3 pt-4 border-t border-slate-100">
-                        <button id="btn-cancel-generate" 
+                        <button id="btn-cancel-generate"
                             class="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
                             style="border:1px solid #e2e8f0;color:#64748b;">Cancel</button>
                         <button id="btn-save-generate"
@@ -1039,7 +1174,7 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button onclick="closeViewReportModal()" 
+                        <button onclick="closeViewReportModal()"
                             class="rounded-lg p-2 transition-colors hover:bg-slate-100">
                             <i data-lucide="x" style="width:20px;height:20px;color:#64748b;"></i>
                         </button>
@@ -1100,6 +1235,23 @@
             return m[result] || '#f8fafc';
         }
 
+        function getGradeColorClass(grade, result) {
+            const bg = resultBg(result);
+            const color = resultColor(result);
+            return `rounded-full font-semibold`;
+        }
+
+        function getResultColorClass(result) {
+            const classMap = {
+                'DIST': 'bg-emerald-50 text-emerald-700',
+                'STRONG CREDIT': 'bg-blue-50 text-blue-700',
+                'CRED': 'bg-indigo-50 text-indigo-700',
+                'PASS': 'bg-amber-50 text-amber-700',
+                'FAIL': 'bg-red-50 text-red-700'
+            };
+            return classMap[result] || 'bg-slate-50 text-slate-700';
+        }
+
         function overallResult(gpa) {
             if (gpa >= 3.5) return 'First Class';
             if (gpa >= 3.0) return 'Second Class Upper';
@@ -1125,7 +1277,7 @@
         const LOGO_KEY = 'lidoma_logo_base64';
 
         // ========== BACKEND API / AUTH ==========
-        const API_BASE = 'https://lidoma-backend.onrender.com';
+        const API_BASE = 'http://localhost:8787';
         const TOKEN_KEY = 'lidoma_jwt';
 
         // Keep-alive ping every 14 minutes to prevent Render free tier cold starts
@@ -1285,7 +1437,7 @@
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.src = 'image.png';
-                
+
                 await new Promise((resolve, reject) => {
                     img.onload = resolve;
                     img.onerror = () => reject('Image load failed');
@@ -1296,7 +1448,7 @@
                 canvas.height = img.height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
-                
+
                 const dataURL = canvas.toDataURL('image/png');
                 logoDataURL = dataURL;
                 localStorage.setItem(LOGO_KEY, dataURL);
@@ -1591,7 +1743,7 @@
             } catch (e) {
                 console.error('LocalDB init error:', e);
             }
-            
+
             if (window.dataSdk) {
                 try {
                     await window.dataSdk.init({
@@ -1610,7 +1762,7 @@
                     console.warn('Data SDK init error:', e);
                 }
             }
-            
+
             // No extra renderAll() here — loadInitData already renders
         })();
 
@@ -1657,7 +1809,7 @@
         function renderStudents() {
             const tbody = document.getElementById('student-mgmt-tbody');
             const empty = document.getElementById('student-empty-state');
-            
+
             const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
             let totalRendered = 0;
             tbody.innerHTML = '';
@@ -1722,7 +1874,7 @@
             } else {
                 empty.classList.add('hidden');
             }
-            
+
             lucide.createIcons({ nodes: [tbody] });
 
             // Delete button handlers
@@ -1772,7 +1924,7 @@
             document.getElementById('edit-student-name').value = studentName;
             document.getElementById('edit-student-class').value = studentClass;
             document.getElementById('edit-student-error').classList.add('hidden');
-            
+
             const overlay = document.getElementById('edit-student-overlay');
             overlay.classList.remove('hidden');
             lucide.createIcons({ nodes: [overlay] });
@@ -1834,7 +1986,7 @@
         // Edit student modal event listeners
         document.getElementById('btn-cancel-edit-student').addEventListener('click', closeEditStudentModal);
         document.getElementById('btn-save-edit-student').addEventListener('click', saveEditedStudent);
-        
+
         // Close on Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -1863,7 +2015,7 @@
             document.getElementById('edit-grade-year').value = record.academic_year;
             document.getElementById('edit-grade-comment').value = record.teacher_comment || '';
             document.getElementById('edit-grade-error').classList.add('hidden');
-            
+
             const overlay = document.getElementById('edit-grade-overlay');
             overlay.classList.remove('hidden');
             lucide.createIcons({ nodes: [overlay] });
@@ -1936,13 +2088,13 @@
             const search = document.getElementById('report-search').value;
             const studentClass = document.getElementById('filter-class').value;
             const term = document.getElementById('filter-term').value;
-            
+
             try {
                 const params = new URLSearchParams();
                 if (search) params.append('search', search);
                 if (studentClass) params.append('student_class', studentClass);
                 if (term) params.append('term', term);
-                
+
                 allReports = await apiRequest(`/api/reports?${params}`);
                 renderReportsByClass(allReports);
             } catch (error) {
@@ -1954,23 +2106,23 @@
             const container = document.getElementById('class-folders-container');
             const emptyState = document.getElementById('reports-empty-state');
             const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
-            
+
             container.innerHTML = '';
-            
+
             if (reports.length === 0) {
                 emptyState.classList.remove('hidden');
                 return;
             }
-            
+
             emptyState.classList.add('hidden');
-            
+
             classes.forEach(cls => {
                 const classReports = reports.filter(r => r.student_class === cls);
                 if (classReports.length === 0) return;
-                
+
                 const folderId = `class-${cls.replace(/\s+/g, '-').toLowerCase()}`;
                 const chevronId = `chevron-${cls.replace(/\s+/g, '-').toLowerCase()}`;
-                
+
                 const folderHTML = `
                     <div class="rounded-xl overflow-hidden" style="background:#ffffff;border:1px solid #e2e8f0;">
                         <div class="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50"
@@ -2015,7 +2167,7 @@
                 `;
                 container.insertAdjacentHTML('beforeend', folderHTML);
             });
-            
+
             lucide.createIcons();
         }
 
@@ -2617,13 +2769,13 @@
                 studentSelect.disabled = true;
             } else {
                 const classStudents = students.filter(s => s.class === selectedClass);
-                studentSelect.innerHTML = '<option value="">Select a student...</option>' + 
+                studentSelect.innerHTML = '<option value="">Select a student...</option>' +
                     classStudents.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
                 studentSelect.disabled = false;
             }
 
             // Update Report Select (Always show all students)
-            const allStudentsOpts = '<option value="">Select a student...</option>' + 
+            const allStudentsOpts = '<option value="">Select a student...</option>' +
                 students.map(s => `<option value="${s.id}">${s.name} (${s.id}) — ${s.class}</option>`).join('');
             reportSelect.innerHTML = allStudentsOpts;
             if (selectedStudentId) reportSelect.value = selectedStudentId;
@@ -2718,37 +2870,75 @@
             setTimeout(() => t.remove(), 3000);
         }
 
+        // ========== LOADING INDICATOR ==========
+        function showLoading(isLoading) {
+            let loadingOverlay = document.getElementById('loading-overlay');
+            if (isLoading) {
+                if (!loadingOverlay) {
+                    loadingOverlay = document.createElement('div');
+                    loadingOverlay.id = 'loading-overlay';
+                    loadingOverlay.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0,0,0,0.5);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 9999;
+                    `;
+                    loadingOverlay.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 0.5rem; text-align: center;">
+                            <div style="width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
+                            <p style="color: #6b7280; font-size: 0.875rem;">Loading...</p>
+                        </div>
+                        <style>
+                            @keyframes spin { to { transform: rotate(360deg); } }
+                        </style>
+                    `;
+                    document.body.appendChild(loadingOverlay);
+                }
+                loadingOverlay.style.display = 'flex';
+            } else {
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+        }
+
         // ========== TABS ==========
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
-                document.querySelectorAll('.tab-btn').forEach(b => { 
-                    b.classList.remove('tab-active'); 
-                    b.style.color = '#64748b'; 
-                    b.style.borderColor = 'transparent'; 
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('tab-active');
+                    b.style.color = '#64748b';
+                    b.style.borderColor = 'transparent';
                 });
-                
+
                 btn.classList.add('tab-active');
-                
+
                 // Safe access to primary color
                 const cfg = (window.elementSdk && window.elementSdk.config) ? window.elementSdk.config : defaultConfig;
                 const primary = cfg.primary_action_color || defaultConfig.primary_action_color;
-                
+
                 btn.style.color = primary;
                 btn.style.borderColor = primary;
-                
-                ['students', 'entry', 'report', 'analytics', 'reports-archive', 'settings'].forEach(t => {
+
+                ['students', 'entry', 'report', 'analytics', 'reports-archive', 'teacher-access', 'settings'].forEach(t => {
                     const el = document.getElementById('tab-' + t);
                     if (el) {
-                        if (t === tab) { 
-                            el.classList.remove('hidden'); 
-                            el.classList.add('fade-in'); 
+                        if (t === tab) {
+                            el.classList.remove('hidden');
+                            el.classList.add('fade-in');
                         } else {
                             el.classList.add('hidden');
                         }
                     }
                 });
-                
+
                 if (tab === 'report') {
                     try {
                         buildReport();
@@ -2831,7 +3021,7 @@
             };
 
             const result = await LocalDB.create(payload);
-            
+
             // Sync with dataSdk if available
             if (window.dataSdk) window.dataSdk.create(payload).catch(e => console.error('Sync failed', e));
 
@@ -2861,7 +3051,7 @@
             if (!deleteTarget) return;
             document.getElementById('btn-confirm-del').textContent = 'Deleting...';
             document.getElementById('btn-confirm-del').disabled = true;
-            
+
             const res = await LocalDB.delete(deleteTarget.__backendId);
             if (window.dataSdk) window.dataSdk.delete(deleteTarget).catch(e => console.error('Sync delete failed', e));
 
@@ -2891,15 +3081,15 @@
             const element = document.getElementById('print-report');
             const student = students.find(s => s.id === selectedStudentId);
             const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Report.pdf` : 'Student_Report.pdf';
-            
+
             // Improved settings for PDF generation
             const opt = {
                 margin: [0, 0],
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 3, 
-                    useCORS: true, 
+                html2canvas: {
+                    scale: 3,
+                    useCORS: true,
                     logging: false,
                     letterRendering: true,
                     allowTaint: false, // Must be false to allow export
@@ -2926,7 +3116,7 @@
             const content = document.getElementById('print-report').innerHTML;
             const student = students.find(s => s.id === selectedStudentId);
             const fileName = student ? `${student.name.replace(/\s+/g, '_')}_Report.doc` : 'Student_Report.doc';
-            
+
             const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
                 <head><meta charset='utf-8'><title>Export to Word</title>
                 <style>
@@ -2938,7 +3128,7 @@
                 </head><body>`;
             const footer = "</body></html>";
             const sourceHTML = header + content + footer;
-            
+
             const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -2957,9 +3147,9 @@
 
             showToast('Generating Image...', 'info');
             try {
-                const canvas = await html2canvas(element, { 
-                    scale: 2, 
-                    useCORS: true, 
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
                     allowTaint: false,
                     scrollX: 0,
                     scrollY: 0
@@ -3182,7 +3372,7 @@
         // ========== BUILD REPORT ==========
         function buildReport() {
             const c = document.getElementById('report-content');
-            
+
             const reportRecords = allRecords.filter(r => r.student_id === selectedStudentId);
 
             if (!selectedStudentId || reportRecords.length === 0) {
@@ -3195,14 +3385,14 @@
             const rt = "PROGRESS REPORT CARD";
             const r0 = reportRecords[0];
             const ay = r0.academic_year || cfg.academic_year || defaultConfig.academic_year;
-            
+
             const student = students.find(s => s.id === selectedStudentId);
             const scores = reportRecords.map(r => r.score);
             const grades = reportRecords.map(r => calcGrade(r.score, student.class));
             const points = grades.map(g => g.points);
-            
+
             const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(student.class);
-            
+
             let aggregate;
             if (isForm1Or2) {
                 // Aggregate from all subjects as single letter grade
@@ -3249,7 +3439,7 @@
 
             // Handle logo display based on whether it's safe for canvas export
             const isDataURL = logoDataURL.startsWith('data:');
-            const logoHTML = isDataURL 
+            const logoHTML = isDataURL
                 ? `<img src="${logoDataURL}" alt="Logo" class="h-20 w-20 object-contain drop-shadow-sm" onerror="this.style.display='none'">`
                 : `<div class="h-20 w-20 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-[9px] text-center font-bold uppercase p-2 text-slate-400">
                      Manual Logo
@@ -3547,6 +3737,208 @@
                     this.value = val;
                 }
             });
+        }
+
+        // ========== TEACHER ACCESS FUNCTIONALITY ==========
+        let teacherResults = [];
+
+        // Teacher access event listeners
+        document.getElementById('teacher-class-select').addEventListener('change', loadTeacherSubjects);
+        document.getElementById('teacher-subject-select').addEventListener('change', enableTeacherLoadButton);
+        document.getElementById('btn-load-teacher-results').addEventListener('click', loadTeacherResults);
+        document.getElementById('btn-download-teacher-results').addEventListener('click', downloadTeacherResults);
+        document.getElementById('btn-print-teacher-results').addEventListener('click', () => window.print());
+
+        // Load subjects for selected class
+        async function loadTeacherSubjects() {
+            const classSelect = document.getElementById('teacher-class-select');
+            const subjectSelect = document.getElementById('teacher-subject-select');
+            const selectedClass = classSelect.value;
+
+            // Reset subject select
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+            subjectSelect.disabled = !selectedClass;
+            document.getElementById('btn-load-teacher-results').disabled = true;
+            document.getElementById('btn-download-teacher-results').disabled = true;
+
+            if (!selectedClass) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/teacher/subjects?student_class=${encodeURIComponent(selectedClass)}`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+
+                if (response.ok) {
+                    const subjects = await response.json();
+                    subjects.forEach(subject => {
+                        const option = document.createElement('option');
+                        option.value = subject;
+                        option.textContent = subject;
+                        subjectSelect.appendChild(option);
+                    });
+                } else if (response.status === 401) {
+                    sessionStorage.removeItem(TOKEN_KEY);
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+                showToast('Failed to load subjects', 'error');
+            }
+        }
+
+        // Enable load button when subject is selected
+        function enableTeacherLoadButton() {
+            const classSelect = document.getElementById('teacher-class-select').value;
+            const subjectSelect = document.getElementById('teacher-subject-select').value;
+            document.getElementById('btn-load-teacher-results').disabled = !classSelect || !subjectSelect;
+        }
+
+        // Load teacher results
+        async function loadTeacherResults() {
+            const studentClass = document.getElementById('teacher-class-select').value;
+            const subject = document.getElementById('teacher-subject-select').value;
+            const term = document.getElementById('teacher-term-select').value;
+
+            if (!studentClass || !subject) {
+                showToast('Please select class and subject', 'error');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/teacher/subject-results?student_class=${encodeURIComponent(studentClass)}&subject=${encodeURIComponent(subject)}&term=${encodeURIComponent(term)}`, {
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+
+                if (response.ok) {
+                    teacherResults = await response.json();
+                    displayTeacherResults(studentClass, subject, term);
+                } else if (response.status === 401) {
+                    sessionStorage.removeItem(TOKEN_KEY);
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    showToast(error.detail || 'Failed to load results', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading results:', error);
+                showToast('Failed to load results', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display teacher results
+        function displayTeacherResults(studentClass, subject, term) {
+            const resultsSection = document.getElementById('teacher-results-section');
+            const statsSection = document.getElementById('teacher-stats-section');
+            const tbody = document.getElementById('teacher-results-tbody');
+            const emptyState = document.getElementById('teacher-results-empty');
+            const titleElement = document.getElementById('teacher-results-title');
+            const countElement = document.getElementById('teacher-results-count');
+
+            // Update title
+            titleElement.textContent = `${subject} - ${studentClass} (${term})`;
+
+            if (teacherResults.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                statsSection.classList.add('hidden');
+                countElement.textContent = '0 students';
+                document.getElementById('btn-download-teacher-results').disabled = true;
+            } else {
+                emptyState.classList.add('hidden');
+                statsSection.classList.remove('hidden');
+                document.getElementById('btn-download-teacher-results').disabled = false;
+                countElement.textContent = `${teacherResults.length} students`;
+
+                // Populate table
+                tbody.innerHTML = teacherResults.map((result, index) => {
+                    const gradeInfo = calcGrade(result.score, result.student_class);
+                    return `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900">${result.student_id}</td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900">${result.student_name}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">${result.score}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full" style="background:${resultBg(gradeInfo.result)};color:${resultColor(gradeInfo.result)};">
+                                    ${gradeInfo.grade}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">${gradeInfo.points}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-center">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full" style="background:${resultBg(gradeInfo.result)};color:${resultColor(gradeInfo.result)};">
+                                    ${gradeInfo.result}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900 max-w-xs truncate">${result.teacher_comment || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Update statistics
+                updateTeacherStatistics();
+            }
+
+            resultsSection.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // Update teacher statistics
+        function updateTeacherStatistics() {
+            if (teacherResults.length === 0) return;
+
+            const scores = teacherResults.map(r => r.score);
+            const totalStudents = teacherResults.length;
+            const averageScore = scores.reduce((a, b) => a + b, 0) / totalStudents;
+            const highestScore = Math.max(...scores);
+
+            let passCount = 0;
+            teacherResults.forEach(result => {
+                const gradeInfo = calcGrade(result.score, result.student_class);
+                if (gradeInfo.result !== 'FAIL') passCount++;
+            });
+            const passRate = (passCount / totalStudents) * 100;
+
+            document.getElementById('teacher-stat-total').textContent = totalStudents;
+            document.getElementById('teacher-stat-average').textContent = averageScore.toFixed(1);
+            document.getElementById('teacher-stat-highest').textContent = highestScore;
+            document.getElementById('teacher-stat-passrate').textContent = `${passRate.toFixed(1)}%`;
+        }
+
+        // Download teacher results as CSV
+        function downloadTeacherResults() {
+            if (teacherResults.length === 0) {
+                showToast('No data to download', 'error');
+                return;
+            }
+
+            const studentClass = document.getElementById('teacher-class-select').value;
+            const subject = document.getElementById('teacher-subject-select').value;
+            const term = document.getElementById('teacher-term-select').value;
+
+            // Create CSV content
+            let csv = '#,Student ID,Student Name,Class,Subject,Term,Score,Grade,Points,Result,Teacher Comment\n';
+
+            teacherResults.forEach((result, index) => {
+                const gradeInfo = calcGrade(result.score, result.student_class);
+                csv += `${index + 1},"${result.student_id}","${result.student_name}","${result.student_class}","${subject}","${term}",${result.score},"${gradeInfo.grade}",${gradeInfo.points},"${gradeInfo.result}","${result.teacher_comment || ''}"\n`;
+            });
+
+            // Create and download file
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${subject}_${studentClass}_${term}_Results.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('Results downloaded successfully', 'success');
         }
 
         // Init icons

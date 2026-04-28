@@ -10,7 +10,7 @@ try { $py = (Get-Command py -ErrorAction Stop).Source } catch { }
 $venvPython = ".\.venv\Scripts\python.exe"
 if (!(Test-Path $venvPython)) {
   if ($py) {
-    & py -3.13 -m venv .venv
+    & py -3.14 -m venv .venv
   } else {
     python -m venv .venv
   }

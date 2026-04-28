@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
@@ -665,6 +666,58 @@ def list_records(
         )
         for r in rows
     ]
+
+
+@app.get("/api/teacher/subject-results", response_model=list[RecordOut])
+def teacher_subject_results(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    student_class: str,
+    subject: str,
+    term: str,
+    academic_year: str | None = None,
+):
+    """Get results for a specific subject and class for teacher access"""
+    q = select(GradeRecord).where(
+        GradeRecord.student_class == student_class,
+        GradeRecord.subject == subject,
+        GradeRecord.term == term
+    ).order_by(GradeRecord.student_name)
+    
+    if academic_year:
+        q = q.where(GradeRecord.academic_year == academic_year)
+    
+    rows = db.scalars(q).all()
+    return [
+        RecordOut(
+            id=r.id,
+            student_id=r.student_id,
+            student_name=r.student_name,
+            student_class=r.student_class,
+            term=r.term,
+            academic_year=r.academic_year,
+            subject=r.subject,
+            score=r.score,
+            teacher_comment=r.teacher_comment,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+@app.get("/api/teacher/subjects", response_model=list[str])
+def teacher_available_subjects(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    student_class: str,
+):
+    """Get list of available subjects for a specific class"""
+    subjects = db.scalars(
+        select(GradeRecord.subject).distinct()
+        .where(GradeRecord.student_class == student_class)
+        .order_by(GradeRecord.subject)
+    ).all()
+    return list(subjects)
 
 
 @app.post("/api/records", response_model=RecordOut, status_code=201)
@@ -1709,4 +1762,21 @@ def download_class_reports(
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=\"{student_class}_{term}_{academic_year}_Reports.zip\""}
     )
+
+
+@app.get("/")
+def serve_main_page():
+    """Serve the main LIDOMA HTML page"""
+    return FileResponse("../LIDOMA.HTML", media_type="text/html")
+
+
+@app.get("/favicon.ico")
+def serve_favicon():
+    """Serve a simple favicon to avoid 404 errors"""
+    return Response(status_code=204)  # Return no content
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
