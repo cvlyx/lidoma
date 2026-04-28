@@ -1277,7 +1277,10 @@
         const LOGO_KEY = 'lidoma_logo_base64';
 
         // ========== BACKEND API / AUTH ==========
-        const API_BASE = 'http://localhost:8787';
+        // Use production URL on Vercel, localhost for local development
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8787'
+            : 'https://lidoma-backend.onrender.com';
         const TOKEN_KEY = 'lidoma_jwt';
 
         // Keep-alive ping every 14 minutes to prevent Render free tier cold starts
