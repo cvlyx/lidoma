@@ -72,10 +72,12 @@ def calc_grade_backend(score: int, student_class: str) -> dict:
     if is_form1_or_2:
         if score >= 80:
             return {"grade": "A", "points": 1, "result": "PASS"}
-        elif score >= 60:
+        elif score >= 70:
             return {"grade": "B", "points": 1, "result": "PASS"}
-        elif score >= 40:
+        elif score >= 60:
             return {"grade": "C", "points": 1, "result": "PASS"}
+        elif score >= 50:
+            return {"grade": "D", "points": 1, "result": "PASS"}
         else:
             return {"grade": "F", "points": 0, "result": "FAIL"}
     else:
