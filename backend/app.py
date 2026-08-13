@@ -324,6 +324,7 @@ class ParentLookupOut(BaseModel):
     records: list[RecordOut]
     settings: SettingsOut
     logo_data_url: str | None = None
+    reports: list[ParentReportOut] = []
 
 
 class ReportSummary(BaseModel):
@@ -343,6 +344,10 @@ class ReportSummary(BaseModel):
 class ReportFull(ReportSummary):
     report_data: dict
     pdf_data: str | None = None
+
+
+class ParentReportOut(ReportSummary):
+    report_data: dict
 
 
 def get_current_user(
@@ -492,6 +497,11 @@ def parent_lookup(payload: ParentLookupIn, db: Annotated[Session, Depends(get_db
 
     st = _read_settings(db)
     logo = db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
+    reports = db.scalars(
+        select(SchoolReport)
+        .where(SchoolReport.student_id == student.student_id)
+        .order_by(SchoolReport.academic_year.desc(), SchoolReport.id.asc())
+    ).all()
     return ParentLookupOut(
         student=StudentOut(
             student_id=student.student_id,
@@ -516,6 +526,66 @@ def parent_lookup(payload: ParentLookupIn, db: Annotated[Session, Depends(get_db
         ],
         settings=st,
         logo_data_url=(logo.data_url if logo else None),
+        reports=[
+            ParentReportOut(
+                id=r.id,
+                student_id=r.student_id,
+                student_name=r.student_name,
+                student_class=r.student_class,
+                term=r.term,
+                academic_year=r.academic_year,
+                total_subjects=r.total_subjects,
+                average_score=r.average_score,
+                aggregate_points=r.aggregate_points,
+                position=r.position,
+                created_at=r.created_at,
+                report_data=json.loads(r.report_data),
+            )
+            for r in reports
+        ],
+    )
+
+
+class ParentReportPdfIn(BaseModel):
+    student_id: str = Field(..., min_length=3, max_length=32)
+    student_name: str = Field(..., min_length=1, max_length=120)
+    term: str = Field(..., min_length=1, max_length=32)
+    academic_year: str = Field(..., min_length=1, max_length=32)
+
+
+@app.post("/api/parent/report-pdf")
+def parent_report_pdf(
+    payload: ParentReportPdfIn,
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Public download of a student's report PDF (guarded by name + ID match)."""
+    if not REPORTLAB_AVAILABLE:
+        raise HTTPException(status_code=500, detail="PDF generation library not available")
+
+    student = db.scalar(select(Student).where(Student.student_id == payload.student_id))
+    if not student or student.name.strip().lower() != payload.student_name.strip().lower():
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    report = db.scalar(
+        select(SchoolReport)
+        .where(SchoolReport.student_id == payload.student_id)
+        .where(SchoolReport.term == payload.term)
+        .where(SchoolReport.academic_year == payload.academic_year)
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    report_data = json.loads(report.report_data)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc.build(_build_report_pdf_elements(report, report_data))
+    buffer.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=\"{report.student_name}_{report.term}_{report.academic_year}_Report.pdf\""}
     )
 
 
@@ -1547,7 +1617,33 @@ def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
     
     styles = getSampleStyleSheet()
     elements = []
-    
+
+    # Embed the school logo (if configured) at the top of the report
+    try:
+        import base64, re
+        from io import BytesIO as _BytesIO
+        from reportlab.platypus import Image as RLImage
+        from reportlab.lib.utils import ImageReader
+        _db = SessionLocal()
+        try:
+            _logo = _db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
+        finally:
+            _db.close()
+        if _logo and _logo.data_url:
+            _m = re.match(r"data:image/([a-zA-Z0-9.+-]+);base64,(.*)", _logo.data_url, re.S)
+            if _m:
+                _raw = base64.b64decode(_m.group(2))
+                _reader = ImageReader(_BytesIO(_raw))
+                _iw, _ih = _reader.getSize()
+                _max = 0.9 * inch
+                _ratio = min(_max / _iw, _max / _ih) if _iw and _ih else 1
+                _img = RLImage(_BytesIO(_raw), width=_iw * _ratio, height=_ih * _ratio)
+                _img.hAlign = "CENTER"
+                elements.append(_img)
+                elements.append(Spacer(1, 0.1 * inch))
+    except Exception:
+        pass
+
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
