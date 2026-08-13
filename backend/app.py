@@ -314,17 +314,26 @@ class LogoIn(BaseModel):
     data_url: str = Field(..., min_length=20)
 
 
-class ParentLookupIn(BaseModel):
+class ParentLoginIn(BaseModel):
     student_id: str = Field(..., min_length=3, max_length=32)
     student_name: str = Field(..., min_length=1, max_length=120)
 
 
-class ParentLookupOut(BaseModel):
+class ParentLoginOut(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
     student: StudentOut
-    records: list[RecordOut]
-    settings: SettingsOut
-    logo_data_url: str | None = None
-    reports: list[ParentReportOut] = []
+    reports: list[ReportSummary] = []
+
+
+class ParentMeOut(BaseModel):
+    student: StudentOut
+    reports: list[ReportSummary] = []
+
+
+class ParentDownloadIn(BaseModel):
+    term: str | None = Field(default=None, max_length=32)
+    academic_year: str | None = Field(default=None, max_length=32)
 
 
 class ReportSummary(BaseModel):
@@ -346,8 +355,40 @@ class ReportFull(ReportSummary):
     pdf_data: str | None = None
 
 
-class ParentReportOut(ReportSummary):
-    report_data: dict
+def _student_out(student: Student) -> StudentOut:
+    return StudentOut(
+        student_id=student.student_id,
+        name=student.name,
+        student_class=student.student_class,
+        created_at=student.created_at,
+    )
+
+
+def get_parent_student(
+    token: Annotated[str, Depends(oauth2_scheme)], db: Annotated[Session, Depends(get_db)]
+) -> Student:
+    """Resolve the student whose reports a parent token may access."""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+        if payload.get("role") != "parent" or not payload.get("sub"):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+        sid = payload["sub"]
+    except JWTError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session") from e
+
+    student = db.scalar(select(Student).where(Student.student_id == sid))
+    if not student:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+    return student
+
+
+def _require_parent_report(
+    report_id: int, student: Student, db: Session
+) -> SchoolReport:
+    report = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
+    if not report or report.student_id != student.student_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    return report
 
 
 def get_current_user(
@@ -476,105 +517,59 @@ def login(
     return TokenOut(access_token=_create_access_token(sub=user.username, role=user.role))
 
 
-# ---------- Public (Parent Portal) ----------
+# ---------- Parent Portal (login-gated) ----------
 
 
-@app.post("/api/parent/lookup", response_model=ParentLookupOut)
-def parent_lookup(payload: ParentLookupIn, db: Annotated[Session, Depends(get_db)]):
+@app.post("/api/parent/login", response_model=ParentLoginOut)
+def parent_login(payload: ParentLoginIn, db: Annotated[Session, Depends(get_db)]):
+    """Parents sign in with the Student ID + full name shown on the report card."""
     student = db.scalar(select(Student).where(Student.student_id == payload.student_id))
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
+    if not student or student.name.strip().lower() != payload.student_name.strip().lower():
+        raise HTTPException(status_code=404, detail="Student not found. Check the Student ID and name on the report card.")
 
-    # Keep it strict: require name match (case-insensitive exact) to reduce accidental disclosure.
-    if student.name.strip().lower() != payload.student_name.strip().lower():
-        raise HTTPException(status_code=404, detail="Student not found")
-
-    recs = db.scalars(
-        select(GradeRecord)
-        .where(GradeRecord.student_id == student.student_id)
-        .order_by(GradeRecord.created_at.asc())
-    ).all()
-
-    st = _read_settings(db)
-    logo = db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
-    reports = db.scalars(
-        select(SchoolReport)
-        .where(SchoolReport.student_id == student.student_id)
-        .order_by(SchoolReport.academic_year.desc(), SchoolReport.id.asc())
-    ).all()
-    return ParentLookupOut(
-        student=StudentOut(
-            student_id=student.student_id,
-            name=student.name,
-            student_class=student.student_class,
-            created_at=student.created_at,
-        ),
-        records=[
-            RecordOut(
-                id=r.id,
-                student_id=r.student_id,
-                student_name=r.student_name,
-                student_class=r.student_class,
-                term=r.term,
-                academic_year=r.academic_year,
-                subject=r.subject,
-                score=r.score,
-                teacher_comment=r.teacher_comment,
-                created_at=r.created_at,
-            )
-            for r in recs
-        ],
-        settings=st,
-        logo_data_url=(logo.data_url if logo else None),
-        reports=[
-            ParentReportOut(
-                id=r.id,
-                student_id=r.student_id,
-                student_name=r.student_name,
-                student_class=r.student_class,
-                term=r.term,
-                academic_year=r.academic_year,
-                total_subjects=r.total_subjects,
-                average_score=r.average_score,
-                aggregate_points=r.aggregate_points,
-                position=r.position,
-                created_at=r.created_at,
-                report_data=json.loads(r.report_data),
-            )
-            for r in reports
-        ],
+    reports = _build_report_summaries(db, student_id=student.student_id)
+    return ParentLoginOut(
+        access_token=_create_access_token(sub=student.student_id, role="parent"),
+        token_type="bearer",
+        student=_student_out(student),
+        reports=reports,
     )
 
 
-class ParentReportPdfIn(BaseModel):
-    student_id: str = Field(..., min_length=3, max_length=32)
-    student_name: str = Field(..., min_length=1, max_length=120)
-    term: str = Field(..., min_length=1, max_length=32)
-    academic_year: str = Field(..., min_length=1, max_length=32)
-
-
-@app.post("/api/parent/report-pdf")
-def parent_report_pdf(
-    payload: ParentReportPdfIn,
+@app.get("/api/parent/me", response_model=ParentMeOut)
+def parent_me(
+    student: Annotated[Student, Depends(get_parent_student)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """Public download of a student's report PDF (guarded by name + ID match)."""
+    """Current parent session: student profile + their report summaries."""
+    return ParentMeOut(
+        student=_student_out(student),
+        reports=_build_report_summaries(db, student_id=student.student_id),
+    )
+
+
+@app.get("/api/parent/reports/{report_id}", response_model=ReportFull)
+def parent_get_report(
+    report_id: int,
+    student: Annotated[Student, Depends(get_parent_student)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Full report detail (same data + shape as the school system) for the logged-in student."""
+    _require_parent_report(report_id, student, db)
+    return _build_report_full(db, report_id)
+
+
+@app.post("/api/parent/reports/{report_id}/pdf")
+def parent_report_pdf(
+    report_id: int,
+    student: Annotated[Student, Depends(get_parent_student)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Download one of the student's reports as the official PDF (same generator as the school)."""
     if not REPORTLAB_AVAILABLE:
         raise HTTPException(status_code=500, detail="PDF generation library not available")
 
-    student = db.scalar(select(Student).where(Student.student_id == payload.student_id))
-    if not student or student.name.strip().lower() != payload.student_name.strip().lower():
-        raise HTTPException(status_code=404, detail="Report not found")
-
-    report = db.scalar(
-        select(SchoolReport)
-        .where(SchoolReport.student_id == payload.student_id)
-        .where(SchoolReport.term == payload.term)
-        .where(SchoolReport.academic_year == payload.academic_year)
-    )
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-
+    report = _require_parent_report(report_id, student, db)
     report_data = json.loads(report.report_data)
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -586,6 +581,50 @@ def parent_report_pdf(
         buffer,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=\"{report.student_name}_{report.term}_{report.academic_year}_Report.pdf\""}
+    )
+
+
+@app.post("/api/parent/reports/download")
+def parent_download_reports(
+    payload: ParentDownloadIn,
+    student: Annotated[Student, Depends(get_parent_student)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Download all of the student's reports as a ZIP."""
+    if not REPORTLAB_AVAILABLE:
+        raise HTTPException(status_code=500, detail="PDF generation library not available")
+
+    q = select(SchoolReport).where(SchoolReport.student_id == student.student_id)
+    if payload.term:
+        q = q.where(SchoolReport.term == payload.term)
+    if payload.academic_year:
+        q = q.where(SchoolReport.academic_year == payload.academic_year)
+    reports = db.scalars(
+        q.order_by(SchoolReport.academic_year.desc(), SchoolReport.id.asc())
+    ).all()
+    reports = [r for r in reports if (r.total_subjects or 0) > 0]
+    if not reports:
+        raise HTTPException(status_code=404, detail="No report cards with grades available")
+
+    import zipfile
+    from fastapi.responses import StreamingResponse
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for report in reports:
+            report_data = json.loads(report.report_data)
+            pdf_buffer = BytesIO()
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+            doc.build(_build_report_pdf_elements(report, report_data))
+            pdf_buffer.seek(0)
+            pdf_filename = f"{report.term}_{report.academic_year}_Report.pdf"
+            zip_file.writestr(pdf_filename, pdf_buffer.getvalue())
+
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=\"reports.zip\""}
     )
 
 
@@ -999,8 +1038,9 @@ def _build_report_summaries(
     term: str | None = None,
     academic_year: str | None = None,
     search: str | None = None,
+    student_id: str | None = None,
 ) -> list[ReportSummary]:
-    """List all reports with live stats via a single aggregated query (shared by admin + public)."""
+    """List reports with live stats via a single aggregated query (shared by admin + parent)."""
     from sqlalchemy import Float, cast
 
     # Subquery: aggregate grade_records per student/term/year
@@ -1016,9 +1056,9 @@ def _build_report_summaries(
         .subquery()
     )
 
-    # When no term/year filter: show only one report per student (highest id = most recent)
-    # When term/year filter applied: show one report per student/term/year (lowest id = canonical)
-    if not term and not academic_year:
+    # When no term/year/student filter: show only one report per student (highest id = most recent)
+    # When filtered (or scoped to one student): show one report per student/term/year (lowest id = canonical)
+    if not term and not academic_year and not student_id:
         canonical_ids = (
             select(func.max(SchoolReport.id).label("id"))
             .group_by(SchoolReport.student_id)
@@ -1040,9 +1080,10 @@ def _build_report_summaries(
             & (SchoolReport.term == grade_agg.c.term)
             & (SchoolReport.academic_year == grade_agg.c.year),
         )
-        .order_by(SchoolReport.student_class.asc(), SchoolReport.average_score.desc())
     )
 
+    if student_id:
+        q = q.where(SchoolReport.student_id == student_id)
     if student_class:
         q = q.where(SchoolReport.student_class == student_class)
     if term:
@@ -1054,6 +1095,11 @@ def _build_report_summaries(
         q = q.where(
             SchoolReport.student_name.ilike(s) | SchoolReport.student_id.ilike(s)
         )
+
+    if student_id:
+        q = q.order_by(SchoolReport.academic_year.desc(), SchoolReport.id.desc())
+    else:
+        q = q.order_by(SchoolReport.student_class.asc(), SchoolReport.average_score.desc())
 
     rows = db.execute(q).all()
 
@@ -1139,20 +1185,8 @@ def list_reports(
     return _build_report_summaries(db, student_class, term, academic_year, search)
 
 
-@app.get("/api/public/reports", response_model=list[ReportSummary])
-def public_list_reports(
-    db: Annotated[Session, Depends(get_db)],
-    student_class: str | None = None,
-    term: str | None = None,
-    academic_year: str | None = None,
-    search: str | None = None,
-):
-    """Public read-only archive of all school reports (for the parent portal)."""
-    return _build_report_summaries(db, student_class, term, academic_year, search)
-
-
 def _build_report_full(db: Session, report_id: int) -> ReportFull:
-    """Shared logic: full report details with fresh grades (admin + public)."""
+    """Shared logic: full report details with fresh grades (admin + parent)."""
     r = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
     if not r:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -1225,15 +1259,6 @@ def get_report(
     db: Annotated[Session, Depends(get_db)],
 ):
     """Get full report details with fresh grades from grade_records"""
-    return _build_report_full(db, report_id)
-
-
-@app.get("/api/public/reports/{report_id}", response_model=ReportFull)
-def public_get_report(
-    report_id: int,
-    db: Annotated[Session, Depends(get_db)],
-):
-    """Public full report details (for the parent portal report card)."""
     return _build_report_full(db, report_id)
 
 

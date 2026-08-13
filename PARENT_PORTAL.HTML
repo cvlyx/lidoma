@@ -99,36 +99,33 @@
 
             to {
                 opacity: 0;
+                transform: translateY(-20px);
             }
         }
 
-        button:active,
-        .btn:active {
-            transform: scale(0.97);
-            transition: transform 0.1s;
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
         }
 
-        input:focus,
-        select:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        .spinner-dark {
+            border: 2px solid rgba(79, 70, 229, 0.2);
+            border-top-color: #4f46e5;
         }
 
-        @media (max-width: 768px) {
-            body {
-                font-size: 14px;
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
             }
+        }
 
-            button, a, input, select {
-                min-height: 44px;
-            }
-
-            #app-header .max-w-6xl {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-
+        @media (max-width: 640px) {
             nav > div {
                 flex-wrap: wrap;
                 justify-content: center;
@@ -184,9 +181,9 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2"
+                    <span id="parent-pill" class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2"
                         style="background:rgba(255,255,255,0.1);color:#f8fafc;border:1px solid rgba(255,255,255,0.2);">
-                        <i data-lucide="external-link" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
+                        <i data-lucide="shield-user" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
                     </span>
                     <span id="year-badge" class="px-3 py-1 rounded-full text-xs font-semibold"
                         style="background:#4f46e5;color:#f8fafc;">2026</span>
@@ -194,102 +191,201 @@
             </div>
         </header>
 
-        <!-- Tabs (visual parity with the school system; staff-only areas are restricted) -->
+        <!-- Tabs -->
         <nav class="w-full px-6 no-print" style="background:#ffffff;border-bottom:1px solid #e2e8f0;" role="navigation"
             aria-label="Main navigation">
             <div class="max-w-6xl mx-auto flex gap-6">
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="users" style="width:15px;height:15px;"></i>
-                        Manage Students</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="pencil" style="width:15px;height:15px;"></i> Enter Grades</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="file-text"
-                            style="width:15px;height:15px;"></i> View Report</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2"
-                            style="width:15px;height:15px;"></i> Analytics</span> </button>
-                <button class="tab-btn tab-active py-3 px-1 text-sm transition-colors" data-tab="reports-archive"
-                    style="border-color:#4f46e5;color:#4f46e5;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="folder-archive"
-                            style="width:15px;height:15px;"></i> Reports Archive</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="graduation-cap"
-                            style="width:15px;height:15px;"></i> Teacher Access</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="settings"
-                            style="width:15px;height:15px;"></i> Settings</span> </button>
+                <button class="tab-btn tab-active py-3 px-1 text-sm transition-colors" data-tab="my-reports"
+                    onclick="switchTab('my-reports')" style="border-color:#4f46e5;color:#4f46e5;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="folder-open"
+                            style="width:15px;height:15px;"></i> My Reports</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="comingSoon('Timetable')" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="calendar"
+                            style="width:15px;height:15px;"></i> Timetable</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="comingSoon('School Fees')" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="wallet"
+                            style="width:15px;height:15px;"></i> School Fees</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="comingSoon('School Notices')" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="megaphone"
+                            style="width:15px;height:15px;"></i> Notices</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="comingSoon('Contact Teachers')" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="message-square"
+                            style="width:15px;height:15px;"></i> Contact</span> </button>
             </div>
         </nav>
 
-        <!-- Main: Reports Archive -->
-        <main id="tab-reports-archive" class="max-w-6xl mx-auto p-6 fade-in">
-            <!-- Header with Actions -->
+        <!-- ============ LOGIN VIEW ============ -->
+        <main id="login-view" class="max-w-6xl mx-auto p-6 fade-in">
+            <div class="max-w-md mx-auto mt-10">
+                <div class="rounded-2xl p-8 shadow-xl card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                    <div class="flex items-center justify-center mb-6">
+                        <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-md"
+                            style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;">
+                            <i data-lucide="lock" style="width:24px;height:24px;"></i>
+                        </div>
+                    </div>
+                    <h2 class="font-display text-2xl font-bold text-center" style="color:#0f172a;">Parent / Guardian Login</h2>
+                    <p class="text-sm text-center mt-2 mb-6" style="color:#64748b;">
+                        Sign in with the <b>Student ID</b> and <b>full name</b> printed on your child&rsquo;s report card.
+                    </p>
+
+                    <form onsubmit="return handleLogin(event)">
+                        <label class="block text-xs font-bold uppercase tracking-widest mb-1.5" style="color:#64748b;">
+                            Student ID</label>
+                        <div class="relative mb-4">
+                            <i data-lucide="hash" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:16px;height:16px;color:#94a3b8;"></i>
+                            <input id="login-id" type="text" autocomplete="off" required
+                                placeholder="e.g. LID1648"
+                                class="w-full rounded-lg pl-10 pr-4 py-3 text-sm"
+                                style="border:1px solid #cbd5e1;color:#1e293b;background:#f8fafc;" oninput="clearLoginError()">
+                        </div>
+
+                        <label class="block text-xs font-bold uppercase tracking-widest mb-1.5" style="color:#64748b;">
+                            Student Name</label>
+                        <div class="relative mb-6">
+                            <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2" style="width:16px;height:16px;color:#94a3b8;"></i>
+                            <input id="login-name" type="text" autocomplete="off" required
+                                placeholder="e.g. SHABA INNOCENT"
+                                class="w-full rounded-lg pl-10 pr-4 py-3 text-sm uppercase"
+                                style="border:1px solid #cbd5e1;color:#1e293b;background:#f8fafc;" oninput="clearLoginError()">
+                        </div>
+
+                        <div id="login-error" class="hidden mb-4 rounded-lg px-4 py-3 text-sm flex items-center gap-2"
+                            style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;">
+                            <i data-lucide="alert-circle" style="width:16px;height:16px;flex-shrink:0;"></i>
+                            <span id="login-error-text"></span>
+                        </div>
+
+                        <button id="login-btn" type="submit"
+                            class="w-full rounded-lg py-3 text-sm font-bold text-white transition-colors flex items-center justify-center gap-2"
+                            style="background:#4f46e5;">
+                            <i data-lucide="log-in" style="width:16px;height:16px;"></i>
+                            <span id="login-btn-label">View My Reports</span>
+                        </button>
+                    </form>
+
+                    <p class="text-center text-xs mt-5" style="color:#94a3b8;">
+                        <i data-lucide="shield-check" style="width:12px;height:12px;display:inline;margin-right:4px;"></i>
+                        You will only see reports for this student.
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- ============ DASHBOARD VIEW ============ -->
+        <main id="dashboard-view" class="max-w-6xl mx-auto p-6 fade-in hidden">
+            <!-- Student banner -->
             <div class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
                 <div class="flex items-center justify-between flex-wrap gap-4">
-                    <div>
-                        <h2 class="font-display text-xl font-bold" style="color:#1e293b;">
-                            <span class="flex items-center gap-2">
-                                <i data-lucide="folder-archive" style="width:24px;height:24px;color:#4f46e5;"></i>
-                                School Reports Archive
-                            </span>
-                        </h2>
-                        <p class="text-sm mt-1" style="color:#64748b;">Official reports for parents and guardians</p>
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-md" style="background:#4f46e5;color:#fff;">
+                            <i data-lucide="graduation-cap" style="width:26px;height:26px;"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display text-xl font-bold" style="color:#1e293b;">
+                                <span id="student-name-display"></span>
+                            </h2>
+                            <div class="flex flex-wrap items-center gap-3 mt-1">
+                                <span class="text-xs font-bold px-2.5 py-1 rounded-full" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">
+                                    <i data-lucide="hash" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>
+                                    <span id="student-id-display"></span>
+                                </span>
+                                <span class="text-xs font-bold px-2.5 py-1 rounded-full" style="background:#f0fdf4;color:#059669;border:1px solid #bbf7d0;">
+                                    <i data-lucide="users" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>
+                                    <span id="student-class-display"></span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">
-                        <i data-lucide="download" style="width:13px;height:13px;display:inline;margin-right:4px;"></i>
-                        Reports are downloadable
-                    </span>
+                    <div class="flex items-center gap-3">
+                        <button onclick="downloadAllReports()"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#059669;color:#fff;" title="Download all report cards as PDFs (ZIP)">
+                            <i data-lucide="archive" style="width:16px;height:16px;"></i> Download All
+                        </button>
+                        <button onclick="logout()"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">
+                            <i data-lucide="log-out" style="width:16px;height:16px;"></i> Logout
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Search and Filters -->
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="md:col-span-2">
-                        <input type="text" id="report-search" placeholder="Search by student name or ID..."
-                            class="w-full rounded-lg px-4 py-2.5 text-sm"
-                            style="border:1px solid #cbd5e1;color:#1e293b;"
-                            oninput="debouncedSearch()">
+                <!-- Stats -->
+                <div class="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="rounded-xl p-4" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <p class="text-[11px] font-black uppercase tracking-widest" style="color:#94a3b8;">Reports</p>
+                        <p class="text-2xl font-black mt-1" style="color:#4f46e5;"><span id="stat-reports">0</span></p>
                     </div>
-                    <div>
-                        <select id="filter-class" onchange="loadReports()"
-                            class="w-full rounded-lg px-3 py-2.5 text-sm"
-                            style="border:1px solid #cbd5e1;color:#1e293b;">
-                            <option value="">All Classes</option>
-                            <option value="FORM 1">FORM 1</option>
-                            <option value="FORM 2">FORM 2</option>
-                            <option value="FORM 3">FORM 3</option>
-                            <option value="FORM 4">FORM 4</option>
-                        </select>
+                    <div class="rounded-xl p-4" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <p class="text-[11px] font-black uppercase tracking-widest" style="color:#94a3b8;">Current Class</p>
+                        <p class="text-sm font-black mt-2 uppercase" style="color:#1e293b;"><span id="stat-class">-</span></p>
                     </div>
-                    <div>
-                        <select id="filter-term" onchange="loadReports()"
-                            class="w-full rounded-lg px-3 py-2.5 text-sm"
-                            style="border:1px solid #cbd5e1;color:#1e293b;">
-                            <option value="">All Terms</option>
-                            <option value="First Term">First Term</option>
-                            <option value="Second Term">Second Term</option>
-                            <option value="Third Term">Third Term</option>
-                        </select>
+                    <div class="rounded-xl p-4" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <p class="text-[11px] font-black uppercase tracking-widest" style="color:#94a3b8;">Academic Year</p>
+                        <p class="text-sm font-black mt-2" style="color:#1e293b;"><span id="stat-year">-</span></p>
+                    </div>
+                    <div class="rounded-xl p-4" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <p class="text-[11px] font-black uppercase tracking-widest" style="color:#94a3b8;">Latest Average</p>
+                        <p class="text-2xl font-black mt-1" style="color:#059669;"><span id="stat-avg">-</span></p>
                     </div>
                 </div>
             </div>
 
             <!-- Loading -->
-            <div id="reports-loading" class="text-center py-20">
-                <div class="spinner" style="width:28px;height:28px;border-width:3px;margin:0 auto;display:block;"></div>
-                <p class="mt-4 text-sm font-semibold" style="color:#64748b;">Loading reports...</p>
+            <div id="reports-loading" class="text-center py-16 hidden">
+                <div class="spinner spinner-dark" style="width:28px;height:28px;border-width:3px;margin:0 auto;display:block;"></div>
+                <p class="mt-4 text-sm font-semibold" style="color:#64748b;">Loading your reports...</p>
             </div>
 
-            <!-- Class Folders -->
-            <div id="class-folders-container" class="space-y-6">
-                <!-- Dynamically populated class sections -->
+            <!-- Reports grouped by year/term -->
+            <div id="reports-container" class="space-y-6">
             </div>
 
             <!-- Empty State -->
             <div id="reports-empty-state" class="text-center py-20 hidden">
                 <i data-lucide="inbox" style="width:64px;height:64px;color:#cbd5e1;margin:0 auto;display:block;"></i>
-                <p class="mt-4 text-lg font-semibold" style="color:#64748b;">No reports found</p>
-                <p class="text-sm mt-2" style="color:#94a3b8;">Try a different search or filter</p>
+                <p class="mt-4 text-lg font-semibold" style="color:#64748b;">No reports published yet</p>
+                <p class="text-sm mt-2" style="color:#94a3b8;">Reports will appear here once published by the school.</p>
+            </div>
+
+            <!-- Coming Soon features -->
+            <div class="rounded-xl p-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+                    <div>
+                        <h3 class="font-display text-lg font-bold" style="color:#1e293b;">
+                            <span class="flex items-center gap-2"><i data-lucide="sparkles" style="width:20px;height:20px;color:#4f46e5;"></i>
+                                More Features Coming Soon</span>
+                        </h3>
+                        <p class="text-sm mt-1" style="color:#64748b;">We are working on these for parents and guardians.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="rounded-xl p-4 relative overflow-hidden card-hover" style="background:#f8fafc;border:1px solid #e2e8f0;" onclick="comingSoon('Timetable')">
+                        <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#fef3c7;color:#b45309;">COMING SOON</span>
+                        <i data-lucide="calendar" style="width:22px;height:22px;color:#4f46e5;"></i>
+                        <p class="text-sm font-bold mt-3" style="color:#1e293b;">Timetable</p>
+                        <p class="text-xs mt-1" style="color:#64748b;">Daily lesson timetable for your child&rsquo;s class.</p>
+                    </div>
+                    <div class="rounded-xl p-4 relative overflow-hidden card-hover" style="background:#f8fafc;border:1px solid #e2e8f0;" onclick="comingSoon('School Fees')">
+                        <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#fef3c7;color:#b45309;">COMING SOON</span>
+                        <i data-lucide="wallet" style="width:22px;height:22px;color:#059669;"></i>
+                        <p class="text-sm font-bold mt-3" style="color:#1e293b;">School Fees</p>
+                        <p class="text-xs mt-1" style="color:#64748b;">Fees statement and payment history.</p>
+                    </div>
+                    <div class="rounded-xl p-4 relative overflow-hidden card-hover" style="background:#f8fafc;border:1px solid #e2e8f0;" onclick="comingSoon('School Notices')">
+                        <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#fef3c7;color:#b45309;">COMING SOON</span>
+                        <i data-lucide="megaphone" style="width:22px;height:22px;color:#d97706;"></i>
+                        <p class="text-sm font-bold mt-3" style="color:#1e293b;">School Notices</p>
+                        <p class="text-xs mt-1" style="color:#64748b;">Official announcements and term dates.</p>
+                    </div>
+                    <div class="rounded-xl p-4 relative overflow-hidden card-hover" style="background:#f8fafc;border:1px solid #e2e8f0;" onclick="comingSoon('Exam Results Alerts')">
+                        <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:#fef3c7;color:#b45309;">COMING SOON</span>
+                        <i data-lucide="bell-ring" style="width:22px;height:22px;color:#dc2626;"></i>
+                        <p class="text-sm font-bold mt-3" style="color:#1e293b;">Results Alerts</p>
+                        <p class="text-xs mt-1" style="color:#64748b;">Get notified by SMS/email when results are out.</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Footer -->
@@ -341,8 +437,70 @@
             ? 'http://localhost:8787'
             : 'https://lidoma.onrender.com';
 
+        const SESSION_KEY = 'lidoma_parent_session';
+        let currentStudent = null;
         let allReports = [];
         let currentViewedReport = null;
+
+        // ========== SESSION ==========
+        function getSession() {
+            try {
+                return JSON.parse(sessionStorage.getItem(SESSION_KEY)) || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function setSession(token, student) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, student }));
+        }
+
+        function clearSession() {
+            sessionStorage.removeItem(SESSION_KEY);
+        }
+
+        function authHeaders(json) {
+            const h = json ? { 'Content-Type': 'application/json' } : {};
+            const s = getSession();
+            if (s && s.token) h['Authorization'] = 'Bearer ' + s.token;
+            return h;
+        }
+
+        async function authFetch(url, options = {}) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                clearSession();
+                showLogin();
+                throw new Error('Your session has expired. Please log in again.');
+            }
+            return res;
+        }
+
+        // ========== VIEWS ==========
+        function showLogin() {
+            document.getElementById('login-view').classList.remove('hidden');
+            document.getElementById('dashboard-view').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.remove('hidden');
+        }
+
+        function switchTab(tab) {
+            if (tab === 'my-reports') {
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    const active = b.getAttribute('data-tab') === 'my-reports';
+                    b.classList.toggle('tab-active', active);
+                    b.style.borderColor = active ? '#4f46e5' : '';
+                    b.style.color = active ? '#4f46e5' : '#64748b';
+                });
+            }
+        }
+
+        function comingSoon(feature) {
+            showToast(feature + ' is coming soon. We are working on it!', 'info');
+        }
 
         // ========== GRADING LOGIC ==========
         function calcGrade(score, studentClass) {
@@ -547,152 +705,220 @@
                 </div>`;
         }
 
-        // ========== ARCHIVE VIEW ==========
-        async function loadReports() {
-            const search = document.getElementById('report-search').value;
-            const studentClass = document.getElementById('filter-class').value;
-            const term = document.getElementById('filter-term').value;
+        // ========== LOGIN ==========
+        function clearLoginError() {
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        function showLoginError(msg) {
+            const box = document.getElementById('login-error');
+            document.getElementById('login-error-text').textContent = msg;
+            box.classList.remove('hidden');
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const idInput = document.getElementById('login-id');
+            const nameInput = document.getElementById('login-name');
+            const studentId = idInput.value.trim().toUpperCase();
+            const studentName = nameInput.value.trim().toUpperCase();
+
+            if (!studentId || !studentName) {
+                showLoginError('Please enter both the Student ID and the Student Name.');
+                return false;
+            }
+
+            const btn = document.getElementById('login-btn');
+            const label = document.getElementById('login-btn-label');
+            btn.disabled = true;
+            label.innerHTML = '<span class="spinner"></span> Signing in...';
 
             try {
-                const params = new URLSearchParams();
-                if (search) params.append('search', search);
-                if (studentClass) params.append('student_class', studentClass);
-                if (term) params.append('term', term);
+                const res = await fetch(`${API_BASE}/api/parent/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId, student_name: studentName })
+                });
+                if (res.status === 404) {
+                    showLoginError('No student found with that ID and name. Check the report card and try again.');
+                    btn.disabled = false;
+                    label.textContent = 'View My Reports';
+                    lucide.createIcons();
+                    return false;
+                }
+                if (!res.ok) throw new Error('Login failed (' + res.status + ')');
 
-                const res = await fetch(`${API_BASE}/api/public/reports?${params}`);
-                if (!res.ok) throw new Error('Failed to load reports');
-                allReports = await res.json();
-                renderReportsByClass(allReports);
+                const data = await res.json();
+                setSession(data.access_token, data.student);
+                currentStudent = data.student;
+                allReports = data.reports || [];
+                renderDashboard();
+                showToast('Welcome, ' + currentStudent.name + '!', 'success');
             } catch (error) {
-                document.getElementById('reports-loading').classList.add('hidden');
-                showToast('Failed to load reports: ' + error.message, 'error');
+                showLoginError('Unable to sign in. Please check your connection and try again.');
+                btn.disabled = false;
+                label.textContent = 'View My Reports';
+                lucide.createIcons();
             }
+            return false;
         }
 
-        function renderReportsByClass(reports) {
-            const container = document.getElementById('class-folders-container');
-            const emptyState = document.getElementById('reports-empty-state');
-            const loading = document.getElementById('reports-loading');
-            const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
-
-            container.innerHTML = '';
-            loading.classList.add('hidden');
-
-            if (reports.length === 0) {
-                emptyState.classList.remove('hidden');
+        // ========== DASHBOARD ==========
+        async function restoreSession() {
+            const s = getSession();
+            if (!s || !s.token) {
+                showLogin();
                 return;
             }
-
-            emptyState.classList.add('hidden');
-
-            classes.forEach(cls => {
-                const classReports = reports.filter(r => r.student_class === cls);
-                if (classReports.length === 0) return;
-
-                const folderId = `class-${cls.replace(/\s+/g, '-').toLowerCase()}`;
-                const chevronId = `chevron-${cls.replace(/\s+/g, '-').toLowerCase()}`;
-
-                const folderHTML = `
-                    <div class="rounded-xl overflow-hidden" style="background:#ffffff;border:1px solid #e2e8f0;">
-                        <div class="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50"
-                            onclick="toggleClassFolder('${folderId}', '${chevronId}')">
-                            <div class="flex items-center gap-3">
-                                <i data-lucide="chevron-down" id="${chevronId}" style="width:20px;height:20px;color:#64748b;"></i>
-                                <i data-lucide="folder" style="width:24px;height:24px;color:#4f46e5;"></i>
-                                <div>
-                                    <h3 class="font-display text-lg font-bold" style="color:#1e293b;">${cls}</h3>
-                                    <p class="text-xs" style="color:#64748b;">${classReports.length} report${classReports.length !== 1 ? 's' : ''}</p>
-                                </div>
-                            </div>
-                            <button onclick="event.stopPropagation(); downloadClassReports('${cls}')"
-                                class="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors"
-                                style="background:#059669;color:#ffffff;">
-                                <span class="flex items-center gap-1.5">
-                                    <i data-lucide="download" style="width:14px;height:14px;"></i>
-                                    Download All
-                                </span>
-                            </button>
-                        </div>
-                        <div id="${folderId}" class="class-folder-content px-6 pb-4">
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm">
-                                    <thead>
-                                        <tr style="background:#f8fafc;">
-                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Pos</th>
-                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student Name</th>
-                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student ID</th>
-                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Term</th>
-                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Subjects</th>
-                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Average</th>
-                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Aggregate</th>
-                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${classReports.map(r => createReportRow(r)).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.insertAdjacentHTML('beforeend', folderHTML);
-            });
-
-            lucide.createIcons();
+            try {
+                const res = await authFetch(`${API_BASE}/api/parent/me`, { headers: authHeaders() });
+                if (!res.ok) throw new Error('Session refresh failed');
+                const data = await res.json();
+                currentStudent = data.student;
+                allReports = data.reports || [];
+                renderDashboard();
+            } catch (e) {
+                if (!e.message.includes('expired')) showLogin();
+            }
         }
 
-        function createReportRow(report) {
+        function logout() {
+            clearSession();
+            currentStudent = null;
+            allReports = [];
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-name').value = '';
+            showLogin();
+            lucide.createIcons();
+            showToast('You have been signed out.', 'info');
+        }
+
+        function reportStatusBadge(report) {
+            if ((report.total_subjects || 0) === 0) {
+                return { text: 'NO GRADES', bg: '#f1f5f9', color: '#94a3b8' };
+            }
             const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(report.student_class);
-            const pos = report.position ? `#${report.position}` : '<span class="text-slate-400">-</span>';
-            const subjectsDisplay = report.total_subjects > 0
-                ? `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f0fdf4;color:#059669;">${report.total_subjects}</span>`
-                : `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#fef2f2;color:#dc2626;">No grades</span>`;
-            const aggBadge = report.aggregate_points >= 99
-                ? `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#fee2e2;color:#dc2626;">FAIL (ENG)</span>`
-                : `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f5f3ff;color:#7c3aed;">${Number(report.aggregate_points || 0).toFixed(1)}</span>`;
+            if (isForm1Or2) {
+                const ok = report.average_score >= 50;
+                return { text: ok ? 'PASS' : 'FAIL', bg: ok ? '#ecfdf5' : '#fef2f2', color: ok ? '#059669' : '#dc2626' };
+            }
+            const fail = report.aggregate_points >= 99;
+            return { text: fail ? 'FAIL (ENG)' : 'PASS', bg: fail ? '#fef2f2' : '#ecfdf5', color: fail ? '#dc2626' : '#059669' };
+        }
+
+        function reportCardHTML(report) {
+            const badge = reportStatusBadge(report);
+            const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(report.student_class);
+            const position = report.position ? `<span class="text-[10px] font-black uppercase tracking-widest" style="color:#94a3b8;">Position</span>
+                    <span class="text-lg font-black" style="color:#4f46e5;">#${report.position}</span>` : '';
+            const metric = isForm1Or2
+                ? `<span class="text-[10px] font-black uppercase tracking-widest" style="color:#94a3b8;">Average</span>
+                    <span class="text-lg font-black" style="color:#1e293b;">${(report.average_score || 0).toFixed(1)}%</span>`
+                : `<span class="text-[10px] font-black uppercase tracking-widest" style="color:#94a3b8;">Aggregate</span>
+                    <span class="text-lg font-black" style="color:#1e293b;">${report.aggregate_points || 0}</span>`;
+            const termBadge = report.term.toUpperCase();
+            const yearBadge = report.academic_year;
+            const hasGrades = (report.total_subjects || 0) > 0;
 
             return `
-                <tr style="border-top:1px solid #f1f5f9;" class="hover:bg-slate-50/50">
-                    <td class="px-4 py-3">${isForm1Or2 ? `<span class="font-bold ${report.position && report.position <= 3 ? 'text-indigo-600' : ''}">${pos}</span>` : pos}</td>
-                    <td class="px-4 py-3 font-medium" style="color:#1e293b;">${report.student_name}</td>
-                    <td class="px-4 py-3 font-mono text-xs" style="color:#64748b;">${report.student_id}</td>
-                    <td class="text-center px-4 py-3 text-xs" style="color:#64748b;">${report.term}</td>
-                    <td class="text-center px-4 py-3">${subjectsDisplay}</td>
-                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#eff6ff;color:#2563eb;">${Number(report.average_score || 0).toFixed(1)}%</span></td>
-                    <td class="text-center px-4 py-3">${aggBadge}</td>
-                    <td class="text-center px-4 py-3">
-                        <div class="flex items-center justify-center gap-2">
-                            <button onclick="viewReport(${report.id})" title="View" class="rounded-lg p-1.5 transition-colors" style="background:#eff6ff;color:#2563eb;"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
-                            <button onclick="downloadReportPdf(${report.id})" title="Download" class="rounded-lg p-1.5 transition-colors" style="background:#f0fdf4;color:#059669;"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
+                <div class="rounded-xl p-5 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                    <div class="flex items-start justify-between flex-wrap gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm" style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);">
+                                <i data-lucide="file-text" style="width:22px;height:22px;"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-black uppercase" style="color:#1e293b;">${termBadge}</span>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:#eef2ff;color:#4f46e5;">${yearBadge}</span>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full uppercase" style="background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;">${report.student_class}</span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 mt-1">
+                                    <span class="text-xs font-semibold" style="color:#64748b;"><i data-lucide="book-open" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>${report.total_subjects || 0} subjects</span>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full uppercase" style="background:${badge.bg};color:${badge.color};">${badge.text}</span>
+                                </div>
+                            </div>
                         </div>
-                    </td>
-                </tr>
-            `;
+                        <div class="flex items-center gap-3">
+                            <div class="text-right mr-1">${position}</div>
+                            <div class="text-right mr-2 border-l pl-4" style="border-color:#e2e8f0;">${metric}</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t flex items-center gap-2" style="border-color:#f1f5f9;">
+                        <button onclick="viewReport(${report.id})"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#eff6ff;color:#2563eb;">
+                            <i data-lucide="eye" style="width:15px;height:15px;"></i> View Report
+                        </button>
+                        <button onclick="downloadReportPdf(${report.id})" ${hasGrades ? '' : 'disabled title="No grades to download"'}
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#f0fdf4;color:#059669;${hasGrades ? '' : 'opacity:0.4;cursor:not-allowed;'}">
+                            <i data-lucide="download" style="width:15px;height:15px;"></i> Download PDF
+                        </button>
+                    </div>
+                </div>`;
         }
 
-        function toggleClassFolder(folderId, chevronId) {
-            const content = document.getElementById(folderId);
-            const chevron = document.getElementById(chevronId);
-            if (!content) return;
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                chevron.setAttribute('data-lucide', 'chevron-down');
+        const TERM_ORDER = { 'First Term': 1, 'Second Term': 2, 'Third Term': 3 };
+
+        function renderDashboard() {
+            if (!currentStudent) return;
+            document.getElementById('student-name-display').textContent = currentStudent.name;
+            document.getElementById('student-id-display').textContent = currentStudent.student_id;
+            document.getElementById('student-class-display').textContent = currentStudent.student_class;
+
+            const reports = allReports || [];
+            document.getElementById('stat-reports').textContent = reports.length;
+            document.getElementById('stat-class').textContent = currentStudent.student_class;
+
+            const years = [...new Set(reports.map(r => r.academic_year))];
+            document.getElementById('stat-year').textContent = years.length ? years.join(', ') : '-';
+
+            const latest = reports[0];
+            document.getElementById('stat-avg').textContent = latest
+                ? (latest.average_score || 0).toFixed(1) + '%'
+                : '-';
+
+            const container = document.getElementById('reports-container');
+            const emptyState = document.getElementById('reports-empty-state');
+
+            if (reports.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
             } else {
-                content.style.display = 'none';
-                chevron.setAttribute('data-lucide', 'chevron-right');
+                emptyState.classList.add('hidden');
+                const byYear = {};
+                reports.forEach(r => {
+                    if (!byYear[r.academic_year]) byYear[r.academic_year] = [];
+                    byYear[r.academic_year].push(r);
+                });
+                const yearKeys = Object.keys(byYear).sort((a, b) => (a < b ? 1 : -1));
+                container.innerHTML = yearKeys.map(year => {
+                    const yearReports = byYear[year].slice().sort((a, b) =>
+                        (TERM_ORDER[b.term] || 0) - (TERM_ORDER[a.term] || 0));
+                    return `
+                        <div class="rounded-xl overflow-hidden card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                            <div class="px-5 py-4 flex items-center gap-3" style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);">
+                                <i data-lucide="calendar-range" style="width:20px;height:20px;color:#818cf8;"></i>
+                                <div>
+                                    <h3 class="font-display text-base font-bold" style="color:#f8fafc;">Academic Year ${year}</h3>
+                                    <p class="text-xs" style="color:#94a3b8;">${yearReports.length} report card${yearReports.length === 1 ? '' : 's'}</p>
+                                </div>
+                            </div>
+                            <div class="p-5 space-y-4">
+                                ${yearReports.map(reportCardHTML).join('')}
+                            </div>
+                        </div>`;
+                }).join('');
             }
+            showDashboard();
             lucide.createIcons();
-        }
-
-        function findReport(id) {
-            return allReports.find(r => r.id === id);
         }
 
         // ========== VIEW MODAL ==========
         async function viewReport(reportId) {
             try {
-                const res = await fetch(`${API_BASE}/api/public/reports/${reportId}`);
+                const res = await authFetch(`${API_BASE}/api/parent/reports/${reportId}`, { headers: authHeaders() });
                 if (!res.ok) throw new Error('Failed to load report');
                 const report = await res.json();
                 currentViewedReport = report;
@@ -700,7 +926,7 @@
                 content.innerHTML = buildReportCardHTML(report);
                 const overlay = document.getElementById('view-report-overlay');
                 overlay.classList.remove('hidden');
-                document.getElementById('btn-download-viewed-report').onclick = () => downloadReportPdf(report.id, report);
+                document.getElementById('btn-download-viewed-report').onclick = () => downloadReportPdf(report.id);
                 lucide.createIcons({ nodes: [overlay] });
             } catch (error) {
                 showToast('Failed to load report: ' + error.message, 'error');
@@ -712,21 +938,15 @@
         }
 
         // ========== DOWNLOADS ==========
-        async function downloadReportPdf(reportId, reportObj) {
-            const report = reportObj || findReport(reportId);
+        async function downloadReportPdf(reportId) {
+            const report = allReports.find(r => r.id === reportId) || currentViewedReport;
             if (!report) { showToast('Report not found', 'error'); return; }
             if (!report.total_subjects) { showToast('This report has no grades to download', 'warning'); return; }
             try {
-                showToast('Preparing PDF...', 'success');
-                const res = await fetch(`${API_BASE}/api/parent/report-pdf`, {
+                showToast('Preparing PDF...', 'info');
+                const res = await authFetch(`${API_BASE}/api/parent/reports/${reportId}/pdf`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        student_id: report.student_id,
-                        student_name: report.student_name,
-                        term: report.term,
-                        academic_year: report.academic_year
-                    })
+                    headers: authHeaders()
                 });
                 if (!res.ok) throw new Error('Download failed');
                 const blob = await res.blob();
@@ -744,58 +964,40 @@
             }
         }
 
-        async function downloadClassReports(className) {
-            const termFilter = document.getElementById('filter-term').value;
-            let classReports = allReports.filter(r => r.student_class === className);
-            if (termFilter) classReports = classReports.filter(r => r.term === termFilter);
-            classReports = classReports.filter(r => r.total_subjects > 0);
-
-            if (classReports.length === 0) {
-                showToast('No reports with grades found for this class', 'warning');
-                return;
-            }
-
-            const btn = document.querySelector(`button[onclick="event.stopPropagation(); downloadClassReports('${className}')"]`);
-            if (btn) btn.disabled = true;
-
+        async function downloadAllReports() {
+            if (!allReports.length) { showToast('No reports to download', 'warning'); return; }
             try {
-                let done = 0;
-                showToast(`Starting: 0 / ${classReports.length} PDFs...`, 'success');
-                for (const report of classReports) {
-                    try {
-                        await downloadReportPdf(report.id, report);
-                        done++;
-                        showToast(`Generated: ${done} / ${classReports.length} PDFs...`, 'success');
-                        await new Promise(r => setTimeout(r, 400));
-                    } catch (err) {
-                        console.warn('Skipped report', report.id, err.message);
-                    }
-                }
-                showToast(`Downloaded ${done} report(s)!`, 'success');
-            } finally {
-                if (btn) btn.disabled = false;
+                showToast('Preparing all reports (ZIP)...', 'info');
+                const res = await authFetch(`${API_BASE}/api/parent/reports/download`, {
+                    method: 'POST',
+                    headers: authHeaders(),
+                    body: JSON.stringify({})
+                });
+                if (!res.ok) throw new Error('Download failed');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentStudent.student_id}_Reports.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('All reports downloaded!', 'success');
+            } catch (error) {
+                showToast('Failed to download: ' + error.message, 'error');
             }
         }
 
         // ========== UI HELPERS ==========
-        function staffOnly() {
-            showToast('This area is restricted to school staff.', 'warning');
-        }
-
-        let searchTimer;
-        function debouncedSearch() {
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => loadReports(), 350);
-        }
-
         function showToast(msg, type = 'success') {
             const c = document.getElementById('toast-container');
             const t = document.createElement('div');
             t.className = 'toast-slide rounded-lg px-4 py-3 shadow-lg flex items-center gap-2 mb-2';
-            const bg = type === 'error' ? '#fef2f2' : type === 'warning' ? '#fffbeb' : '#ecfdf5';
-            const col = type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : '#059669';
+            const bg = type === 'error' ? '#fef2f2' : type === 'warning' ? '#fffbeb' : type === 'info' ? '#eff6ff' : '#ecfdf5';
+            const col = type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : type === 'info' ? '#2563eb' : '#059669';
             t.style.cssText = `background:${bg};border:1px solid ${col}30;color:${col};font-size:13px;`;
-            const icon = type === 'error' ? 'alert-circle' : type === 'warning' ? 'alert-triangle' : 'check-circle';
+            const icon = type === 'error' ? 'alert-circle' : type === 'warning' ? 'alert-triangle' : type === 'info' ? 'info' : 'check-circle';
             t.innerHTML = `<i data-lucide="${icon}" style="width:16px;height:16px;flex-shrink:0;"></i> <span>${msg}</span>`;
             c.appendChild(t);
             lucide.createIcons({ nodes: [t] });
@@ -835,7 +1037,8 @@
                 console.warn('Logo unavailable:', e);
             }
 
-            await loadReports();
+            await restoreSession();
+            lucide.createIcons();
         }
 
         init();
