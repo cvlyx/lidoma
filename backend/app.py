@@ -386,20 +386,12 @@ def _startup():
             )
             db.commit()
 
-        # Resync reports that have 0 subjects or wrong term — always sync against 'Second Term'
+        # Resync stale reports (0 subjects) against their own term/year
         stale_reports = db.scalars(
-            select(SchoolReport).where(
-                (SchoolReport.total_subjects == 0) | (SchoolReport.term != 'Second Term')
-            )
+            select(SchoolReport).where(SchoolReport.total_subjects == 0)
         ).all()
         for r in stale_reports:
-            # Fix the term on the report row first
-            r.term = 'Second Term'
-        if stale_reports:
-            db.commit()
-        # Now resync each one against the actual grade_records
-        for r in stale_reports:
-            sync_report(db, r.student_id, 'Second Term', r.academic_year)
+            sync_report(db, r.student_id, r.term, r.academic_year)
         if stale_reports:
             db.commit()
 
@@ -407,6 +399,7 @@ def _startup():
         students_with_grades = db.execute(
             select(
                 GradeRecord.student_id,
+                GradeRecord.term,
                 GradeRecord.academic_year
             ).distinct()
         ).all()
@@ -414,11 +407,11 @@ def _startup():
             existing = db.scalar(
                 select(SchoolReport)
                 .where(SchoolReport.student_id == row.student_id)
-                .where(SchoolReport.term == 'Second Term')
+                .where(SchoolReport.term == row.term)
                 .where(SchoolReport.academic_year == row.academic_year)
             )
             if not existing:
-                sync_report(db, row.student_id, 'Second Term', row.academic_year)
+                sync_report(db, row.student_id, row.term, row.academic_year)
         db.commit()
 
     finally:
@@ -728,8 +721,6 @@ def create_record(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    # Always enforce Second Term regardless of what was submitted
-    payload.term = "Second Term"
     # Check for duplicate subject for same student/term/year
     existing = db.scalar(
         select(GradeRecord)
@@ -872,18 +863,13 @@ def resync_all_reports(
     db: Annotated[Session, Depends(get_db)],
 ):
     """Force-resync all school reports from live grade_records. Fixes missing/stale reports."""
-    # Fix any reports with wrong term
-    stale = db.scalars(select(SchoolReport).where(SchoolReport.term != 'Second Term')).all()
-    for r in stale:
-        r.term = 'Second Term'
-    if stale:
-        db.commit()
-
-    # Resync every student who has grade records
-    rows = db.execute(select(GradeRecord.student_id, GradeRecord.academic_year).distinct()).all()
+    # Resync every student who has grade records, for each term/year they have
+    rows = db.execute(
+        select(GradeRecord.student_id, GradeRecord.term, GradeRecord.academic_year).distinct()
+    ).all()
     count = 0
     for row in rows:
-        sync_report(db, row.student_id, 'Second Term', row.academic_year)
+        sync_report(db, row.student_id, row.term, row.academic_year)
         count += 1
     db.commit()
     return {"ok": True, "resynced": count}
@@ -1277,13 +1263,15 @@ def cleanup_duplicate_reports(
             cleaned += 1
     db.commit()
 
-    # Step 2: for students with reports across multiple terms/years,
-    # keep only the report with the most subjects (most recent data)
+    # Step 2: for students with duplicate reports within the SAME term/year,
+    # keep only the report with the most subjects (legacy duplicates only)
     multi = db.execute(
         select(
             SchoolReport.student_id,
+            SchoolReport.term,
+            SchoolReport.academic_year,
             func.count(SchoolReport.id).label("cnt")
-        ).group_by(SchoolReport.student_id)
+        ).group_by(SchoolReport.student_id, SchoolReport.term, SchoolReport.academic_year)
         .having(func.count(SchoolReport.id) > 1)
     ).all()
 
@@ -1291,6 +1279,8 @@ def cleanup_duplicate_reports(
         reports = db.scalars(
             select(SchoolReport)
             .where(SchoolReport.student_id == row.student_id)
+            .where(SchoolReport.term == row.term)
+            .where(SchoolReport.academic_year == row.academic_year)
             .order_by(SchoolReport.total_subjects.desc(), SchoolReport.id.desc())
         ).all()
         for r in reports[1:]:
