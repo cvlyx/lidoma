@@ -391,6 +391,25 @@
                                 style="width:20px;height:20px;color:#4f46e5;"></i> Registered Students</span>
                     </h2>
                     <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2" title="Download the student register (PDF / Excel / CSV)">
+                            <span class="text-xs font-bold" style="color:#64748b;"><i data-lucide="download"
+                                    style="width:13px;height:13px;display:inline;margin-right:3px;"></i>Download</span>
+                            <button onclick="exportStudents('pdf')" title="Download as PDF"
+                                class="text-xs font-bold rounded-lg px-2.5 py-1.5 transition-colors"
+                                style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">
+                                <i data-lucide="file-text" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>PDF
+                            </button>
+                            <button onclick="exportStudents('xlsx')" title="Download as Excel sheet"
+                                class="text-xs font-bold rounded-lg px-2.5 py-1.5 transition-colors"
+                                style="background:#ecfdf5;color:#059669;border:1px solid #bbf7d0;">
+                                <i data-lucide="file-spreadsheet" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>Excel
+                            </button>
+                            <button onclick="exportStudents('csv')" title="Download as CSV"
+                                class="text-xs font-bold rounded-lg px-2.5 py-1.5 transition-colors"
+                                style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">
+                                <i data-lucide="table" style="width:12px;height:12px;display:inline;margin-right:3px;"></i>CSV
+                            </button>
+                        </div>
                         <select id="filter-reg-class"
                             class="text-sm rounded-lg px-3 py-1.5 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20">
                             <option value="all">All Classes</option>
@@ -1970,6 +1989,52 @@
                 section.style.display = isHidden ? '' : 'none';
                 chevron.setAttribute('data-lucide', isHidden ? 'chevron-down' : 'chevron-right');
                 lucide.createIcons();
+            }
+        }
+
+        // ========== EXPORT STUDENT REGISTER ==========
+        async function exportStudents(format) {
+            const cls = document.getElementById('filter-reg-class').value;
+            const token = getToken();
+            if (!token) {
+                showToast('Please log in first', 'warning');
+                return;
+            }
+            const params = new URLSearchParams();
+            if (cls && cls !== 'all') params.append('student_class', cls);
+            params.append('format', format);
+            try {
+                showToast('Preparing ' + format.toUpperCase() + '...', 'info');
+                const res = await fetch(`${API_BASE}/api/students/export?${params}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.status === 401) {
+                    showToast('Session expired. Please log in again.', 'warning');
+                    return;
+                }
+                if (!res.ok) {
+                    let detail = 'Export failed';
+                    try {
+                        const j = await res.json();
+                        if (j.detail) detail = j.detail;
+                    } catch (e) { /* ignore */ }
+                    throw new Error(detail);
+                }
+                const blob = await res.blob();
+                const cd = res.headers.get('Content-Disposition') || '';
+                const m = cd.match(/filename="([^"]+)"/);
+                const filename = m ? m[1] : `Student_Register.${format === 'pdf' ? 'pdf' : format === 'xlsx' ? 'xlsx' : 'csv'}`;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Student register downloaded!', 'success');
+            } catch (error) {
+                showToast(error.message || 'Export failed', 'error');
             }
         }
 

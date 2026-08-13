@@ -680,6 +680,199 @@ def list_students(
     ]
 
 
+@app.get("/api/students/export")
+def export_students(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    format: str = "pdf",
+    student_class: str | None = None,
+):
+    """Download the student register (ID + name per class) as PDF, Excel (.xlsx) or CSV."""
+    fmt = format.lower()
+    if fmt not in ("pdf", "xlsx", "csv"):
+        raise HTTPException(status_code=400, detail="Format must be pdf, xlsx or csv")
+
+    q = select(Student)
+    if student_class:
+        q = q.where(Student.student_class == student_class)
+    students = db.scalars(q.order_by(Student.student_class.asc(), Student.name.asc())).all()
+    if not students:
+        raise HTTPException(status_code=404, detail="No students found for this selection")
+
+    settings = _read_settings(db)
+    school_name = settings.school_name or "LIDOMA PRIVATE SECONDARY SCHOOL"
+    scope = student_class or "ALL CLASSES"
+
+    logo_data_url = None
+    logo_row = db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
+    if logo_row:
+        logo_data_url = logo_row.data_url
+
+    if fmt == "pdf":
+        if not REPORTLAB_AVAILABLE:
+            raise HTTPException(status_code=500, detail="PDF generation library not available")
+        buffer = _build_student_register_pdf(school_name, scope, students, logo_data_url)
+        media_type = "application/pdf"
+        filename = f"{scope.replace(' ', '_')}_Student_Register.pdf"
+    elif fmt == "xlsx":
+        buffer = _build_student_register_xlsx(school_name, scope, students)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{scope.replace(' ', '_')}_Student_Register.xlsx"
+    else:
+        buffer = _build_student_register_csv(school_name, scope, students)
+        media_type = "text/csv"
+        filename = f"{scope.replace(' ', '_')}_Student_Register.csv"
+
+    from fastapi.responses import StreamingResponse
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )
+
+
+def _build_student_register_pdf(
+    school_name: str, scope: str, students: list[Student], logo_data_url: str | None
+) -> BytesIO:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+
+    # School logo + name header (mirrors the report card PDFs)
+    try:
+        import base64, re
+        from reportlab.platypus import Image as RLImage
+        from reportlab.lib.utils import ImageReader
+        if logo_data_url:
+            m = re.match(r"data:image/([a-zA-Z0-9.+-]+);base64,(.*)", logo_data_url, re.S)
+            if m:
+                raw = base64.b64decode(m.group(2))
+                reader = ImageReader(BytesIO(raw))
+                iw, ih = reader.getSize()
+                max_sz = 0.7 * inch
+                ratio = min(max_sz / iw, max_sz / ih) if iw and ih else 1
+                img = RLImage(BytesIO(raw), width=iw * ratio, height=ih * ratio)
+                img.hAlign = "CENTER"
+                elements.append(img)
+                elements.append(Spacer(1, 0.08 * inch))
+    except Exception:
+        pass
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "RegisterTitle", parent=styles["Heading1"], fontSize=18,
+        textColor=colors.HexColor("#1e1b4b"), fontName="Helvetica-Bold", spaceAfter=4,
+        alignment=TA_CENTER,
+    )
+    sub_style = ParagraphStyle(
+        "RegisterSub", parent=styles["Heading2"], fontSize=13,
+        textColor=colors.HexColor("#4f46e5"), fontName="Helvetica-Bold", spaceAfter=2,
+        alignment=TA_CENTER,
+    )
+    scope_style = ParagraphStyle(
+        "RegisterScope", parent=styles["Normal"], fontSize=11,
+        textColor=colors.HexColor("#334155"), fontName="Helvetica-Bold", spaceAfter=14,
+        alignment=TA_CENTER,
+    )
+    elements.append(Paragraph(school_name, title_style))
+    elements.append(Paragraph("STUDENT REGISTER", sub_style))
+    elements.append(Paragraph(f"CLASS: {scope}", scope_style))
+
+    data = [["#", "STUDENT ID", "STUDENT NAME", "CLASS"]]
+    for i, s in enumerate(students, 1):
+        data.append([str(i), s.student_id, s.name, s.student_class])
+
+    table = Table(data, colWidths=[0.6 * inch, 1.7 * inch, 3.1 * inch, 1.6 * inch], repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("ALIGN", (1, 0), (1, -1), "CENTER"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph(f"Total Students: {len(students)}", scope_style))
+
+    doc.build(elements)
+    return buffer
+
+
+def _build_student_register_xlsx(school_name: str, scope: str, students: list[Student]) -> BytesIO:
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Excel generation library not available")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Students"
+
+    ws.append([school_name])
+    ws.append(["STUDENT REGISTER", scope])
+    ws.append([])
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1E293B")
+    thin = Side(style="thin", color="CBD5E1")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    ws.append(["#", "Student ID", "Student Name", "Class"])
+    for col in range(1, 5):
+        cell = ws.cell(row=4, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+
+    for i, s in enumerate(students, 1):
+        ws.append([i, s.student_id, s.name, s.student_class])
+        for col in range(1, 5):
+            ws.cell(row=4 + i, column=col).border = border
+
+    ws.column_dimensions["A"].width = 6
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 34
+    ws.column_dimensions["D"].width = 10
+    ws["A1"].font = Font(bold=True, size=16, color="1E1B4B")
+    ws["A2"].font = Font(bold=True, size=12, color="4F46E5")
+    ws.freeze_panes = "A5"
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer
+
+
+def _build_student_register_csv(school_name: str, scope: str, students: list[Student]) -> BytesIO:
+    import csv
+    import io
+
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow([school_name])
+    writer.writerow(["STUDENT REGISTER", scope])
+    writer.writerow([])
+    writer.writerow(["#", "Student ID", "Student Name", "Class"])
+    for i, s in enumerate(students, 1):
+        writer.writerow([i, s.student_id, s.name, s.student_class])
+    return BytesIO(out.getvalue().encode("utf-8"))
+
+
 @app.post("/api/students", response_model=StudentOut, status_code=201)
 def create_student(
     payload: StudentIn,
