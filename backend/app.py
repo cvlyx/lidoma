@@ -1619,7 +1619,7 @@ def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
     elements = []
 
     # Embed the school logo (if configured) at the top of the report
-    _settings = None
+    _school_name_row = None
     try:
         import base64, re
         from io import BytesIO as _BytesIO
@@ -1628,7 +1628,7 @@ def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
         _db = SessionLocal()
         try:
             _logo = _db.scalar(select(SchoolAsset).where(SchoolAsset.key == "logo"))
-            _settings = _db.scalar(select(AppSetting))
+            _school_name_row = _db.scalar(select(AppSetting).where(AppSetting.key == "school_name"))
         finally:
             _db.close()
         if _logo and _logo.data_url:
@@ -1655,7 +1655,8 @@ def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
         spaceAfter=12
     )
     
-    _school_name = report_data.get('school_name') or (getattr(_settings, 'school_name', None) if _settings else None) or 'SCHOOL'
+    _school_name_row = _db.scalar(select(AppSetting).where(AppSetting.key == "school_name"))
+    _school_name = report_data.get('school_name') or (_school_name_row.value if _school_name_row else None) or 'SCHOOL'
     elements.append(Paragraph(f"{_school_name}", title_style))
     elements.append(Paragraph("PROGRESS REPORT CARD", styles['Heading2']))
     elements.append(Spacer(1, 0.2*inch))
