@@ -132,7 +132,7 @@
         <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
             <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                 <div class="p-1 bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img id="portal-logo" src="https://via.placeholder.com/48?text=Logo" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">
+                    <img id="portal-logo" src="https://via.placeholder.com/48?text=Logo" alt="Logo" onerror="this.style.display='none'" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">
                 </div>
                 <div class="min-w-0 flex-1">
                     <h1 id="header-school-name" class="font-display text-sm sm:text-xl font-black text-white uppercase tracking-tight truncate">LIDOMA PRIVATE SECONDARY SCHOOL</h1>
@@ -325,6 +325,13 @@
         const SETTINGS_KEY = 'lidoma_settings';
         const LOGO_KEY = 'lidoma_logo_base64';
 
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8787'
+            : 'https://lidoma-backend.onrender.com';
+
+        // Keep-alive ping every 14 minutes to prevent Render free tier cold starts
+        setInterval(() => fetch(API_BASE + '/api/health').catch(() => {}), 14 * 60 * 1000);
+
         let allRecords = [];
         let students = [];
         let currentStudent = null;
@@ -462,8 +469,8 @@
             }
         }
 
-        function handleLookup() {
-            const nameInp = document.getElementById('lookup-name').value.trim().toLowerCase();
+        async function handleLookup() {
+            const nameInp = document.getElementById('lookup-name').value.trim();
             const idInp = document.getElementById('lookup-id').value.trim().toUpperCase();
 
             if (!nameInp || !idInp) {
@@ -471,8 +478,36 @@
                 return;
             }
 
-            const student = students.find(s => 
-                s.id === idInp && s.name.toLowerCase().includes(nameInp)
+            // Live lookup from the backend first
+            try {
+                const res = await fetch(API_BASE + '/api/parent/lookup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: idInp, student_name: nameInp })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const st = data.student;
+                    currentStudent = { id: st.student_id, name: st.name, class: st.student_class };
+                    allRecords = data.records || [];
+                    if (data.settings && data.settings.school_name) {
+                        document.getElementById('header-school-name').textContent = data.settings.school_name;
+                        document.getElementById('footer-school-name').textContent = data.settings.school_name;
+                    }
+                    if (data.logo_data_url) {
+                        document.getElementById('portal-logo').src = data.logo_data_url;
+                    }
+                    showResults();
+                    return;
+                }
+            } catch (e) {
+                console.warn('Backend lookup unavailable, using local cache:', e);
+            }
+
+            // Fallback: local cache (offline)
+            const nameLower = nameInp.toLowerCase();
+            const student = students.find(s =>
+                s.id === idInp && s.name.toLowerCase().includes(nameLower)
             );
 
             if (student) {
