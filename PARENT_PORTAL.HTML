@@ -1,761 +1,845 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" class="h-full">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <title>LIDOMA - Parent Portal</title>
-    <!-- Tailwind CSS CDN -->
     <script>
         (function() {
             const originalWarn = console.warn;
             console.warn = function(message) {
-                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com should not be used in production')) return;
+                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return;
+                }
                 originalWarn.apply(console, arguments);
             };
         })();
-        window.tailwind = { config: { theme: { extend: { fontFamily: { display: ['Plus Jakarta Sans', 'sans-serif'], sans: ['DM Sans', 'sans-serif'] } } } } };
+        window.tailwind = { config: {} };
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
+        rel="stylesheet">
     <style>
         * {
+            box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
         }
-        
-        body { 
-            background-color: #f8fafc; 
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
             font-family: 'DM Sans', sans-serif;
             overscroll-behavior: none;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        
-        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .glass-card { 
-            background: rgba(255, 255, 255, 0.9); 
-            backdrop-filter: blur(10px); 
-            border: 1px solid rgba(226, 232, 240, 0.8); 
+
+        .font-display {
+            font-family: 'Fraunces', serif;
         }
-        
-        .status-pill { 
-            padding: 2px 10px; 
-            border-radius: 9999px; 
-            font-size: 11px; 
-            font-weight: 700; 
-            text-transform: uppercase; 
+
+        .tab-active {
+            border-bottom: 3px solid;
+            font-weight: 600;
         }
-        
-        .bar-animate { transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        
-        /* Mobile optimizations */
+
+        .fade-in {
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .toast-slide {
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.5s forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        button:active,
+        .btn:active {
+            transform: scale(0.97);
+            transition: transform 0.1s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
         @media (max-width: 768px) {
             body {
                 font-size: 14px;
             }
-            
-            /* Better touch targets */
+
             button, a, input, select {
                 min-height: 44px;
             }
-            
-            /* Smooth scrolling */
-            * {
+
+            #app-header .max-w-6xl {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            nav > div {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .tab-btn {
+                flex: 1 1 45%;
+                min-width: 140px;
+                justify-content: center;
+            }
+
+            .tab-btn span {
+                justify-content: center;
+            }
+
+            .max-w-6xl {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .overflow-x-auto {
                 -webkit-overflow-scrolling: touch;
             }
-            
-            /* Hide scrollbars on mobile for cleaner look */
+
+            .modal-content {
+                max-height: 85vh;
+                overflow-y: auto;
+            }
+
             ::-webkit-scrollbar {
                 display: none;
             }
-            
-            /* Mobile table optimization */
-            table {
-                font-size: 13px;
-            }
-            
-            .status-pill {
-                font-size: 9px;
-                padding: 2px 6px;
-            }
-            
-            /* Compact spacing on mobile */
-            .glass-card {
-                padding: 1rem !important;
-            }
-            
-            /* Mobile header */
-            header h1 {
-                font-size: 14px !important;
-            }
-            
-            header p {
-                font-size: 9px !important;
-            }
-        }
-        
-        /* Active state for touch */
-        button:active, .btn:active {
-            transform: scale(0.97);
-            transition: transform 0.1s;
-        }
-        
-        /* Improved input focus for mobile */
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-        
-        @media print {
-            .no-print, #btn-print, button { display: none !important; }
-            body { background: white !important; }
-            .glass-card { border: none !important; box-shadow: none !important; background: white !important; }
-            header { background: white !important; border-bottom: 2px solid #000 !important; }
-            h1, h2, h3, h4, p, span, td, th { color: black !important; }
-            .bg-slate-900 { background: white !important; color: black !important; border: 2px solid #000 !important; }
-            .status-pill { border: 1px solid #000 !important; }
-            .bar-animate { border: 1px solid #000 !important; }
         }
     </style>
 </head>
-<body class="min-h-screen text-slate-900 flex flex-col">
 
-    <!-- Header -->
-    <header class="w-full py-4 sm:py-6 px-4 sm:px-6 bg-slate-900 border-b border-slate-800">
-        <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <div class="p-1 bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img id="portal-logo" src="https://via.placeholder.com/48?text=Logo" alt="Logo" onerror="this.style.display='none'" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">
-                </div>
-                <div class="min-w-0 flex-1">
-                    <h1 id="header-school-name" class="font-display text-sm sm:text-xl font-black text-white uppercase tracking-tight truncate">LIDOMA PRIVATE SECONDARY SCHOOL</h1>
-                    <p class="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest">Official Parent Portal</p>
-                </div>
-            </div>
-            <button onclick="window.location.reload()" class="p-2 rounded-full hover:bg-slate-800 transition-colors flex-shrink-0">
-                <i data-lucide="refresh-cw" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-400"></i>
-            </button>
-        </div>
-    </header>
+<body class="h-full">
+    <div id="app" class="h-full w-full overflow-auto" style="background:#f0f2f8;">
+        <!-- Toast Container -->
+        <div id="toast-container" class="fixed top-4 right-4 z-50"></div>
 
-    <main id="portal-container" class="flex-1 flex flex-col p-3 sm:p-6 lg:p-8 max-w-4xl mx-auto w-full">
-        <!-- Lookup Screen -->
-        <div id="lookup-screen" class="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-6 sm:space-y-8 fade-in">
-            <div class="text-center px-4">
-                <h2 class="font-display text-2xl sm:text-3xl font-black text-slate-900 mb-2">Student Results Portal</h2>
-                <p class="text-slate-500 text-xs sm:text-sm">Enter the student details to access their latest academic performance records.</p>
-            </div>
-
-            <div class="w-full glass-card p-6 sm:p-8 rounded-2xl shadow-xl space-y-5 sm:space-y-6">
-                <div>
-                    <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Student Full Name</label>
-                    <div class="relative group">
-                        <i data-lucide="user" class="absolute left-3 top-3.5 w-5 h-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none"></i>
-                        <input id="lookup-name" type="text" placeholder="e.g. John Doe" class="w-full pl-10 pr-4 py-3.5 sm:py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900 font-medium text-base">
+        <!-- Header -->
+        <header id="app-header" class="w-full py-5 px-6"
+            style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);">
+            <div class="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-4">
+                    <img id="school-logo-main" src="image.png" alt="Logo" class="w-16 h-16 object-contain rounded-lg"
+                        onerror="this.style.visibility='hidden'">
+                    <div>
+                        <h1 id="school-name-display" class="font-display text-2xl font-bold" style="color:#f8fafc;">
+                            LIDOMA PRIVATE SECONDARY SCHOOL</h1>
+                        <p class="text-sm mt-1" style="color:#94a3b8;">Terminal Examination Report</p>
                     </div>
                 </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2"
+                        style="background:rgba(255,255,255,0.1);color:#f8fafc;border:1px solid rgba(255,255,255,0.2);">
+                        <i data-lucide="external-link" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
+                    </span>
+                    <span id="year-badge" class="px-3 py-1 rounded-full text-xs font-semibold"
+                        style="background:#4f46e5;color:#f8fafc;">2026</span>
+                </div>
+            </div>
+        </header>
 
-                <div>
-                    <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Student ID (LID####)</label>
-                    <div class="relative group">
-                        <i data-lucide="key" class="absolute left-3 top-3.5 w-5 h-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none"></i>
-                        <input id="lookup-id" type="text" placeholder="e.g. LID1234" class="w-full pl-10 pr-4 py-3.5 sm:py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900 font-mono font-bold uppercase text-base">
+        <!-- Tabs (visual parity with the school system; staff-only areas are restricted) -->
+        <nav class="w-full px-6 no-print" style="background:#ffffff;border-bottom:1px solid #e2e8f0;" role="navigation"
+            aria-label="Main navigation">
+            <div class="max-w-6xl mx-auto flex gap-6">
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="users" style="width:15px;height:15px;"></i>
+                        Manage Students</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="pencil" style="width:15px;height:15px;"></i> Enter Grades</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="file-text"
+                            style="width:15px;height:15px;"></i> View Report</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2"
+                            style="width:15px;height:15px;"></i> Analytics</span> </button>
+                <button class="tab-btn tab-active py-3 px-1 text-sm transition-colors" data-tab="reports-archive"
+                    style="border-color:#4f46e5;color:#4f46e5;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="folder-archive"
+                            style="width:15px;height:15px;"></i> Reports Archive</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="graduation-cap"
+                            style="width:15px;height:15px;"></i> Teacher Access</span> </button>
+                <button class="tab-btn py-3 px-1 text-sm transition-colors" onclick="staffOnly()" style="color:#64748b;">
+                    <span class="flex items-center gap-1.5"><i data-lucide="settings"
+                            style="width:15px;height:15px;"></i> Settings</span> </button>
+            </div>
+        </nav>
+
+        <!-- Main: Reports Archive -->
+        <main id="tab-reports-archive" class="max-w-6xl mx-auto p-6 fade-in">
+            <!-- Header with Actions -->
+            <div class="rounded-xl p-6 mb-6 card-hover" style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h2 class="font-display text-xl font-bold" style="color:#1e293b;">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="folder-archive" style="width:24px;height:24px;color:#4f46e5;"></i>
+                                School Reports Archive
+                            </span>
+                        </h2>
+                        <p class="text-sm mt-1" style="color:#64748b;">Official reports for parents and guardians</p>
                     </div>
+                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">
+                        <i data-lucide="download" style="width:13px;height:13px;display:inline;margin-right:4px;"></i>
+                        Reports are downloadable
+                    </span>
                 </div>
 
-                <button id="btn-lookup" class="w-full py-4 sm:py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm sm:text-base">
-                    Access Results <i data-lucide="arrow-right" class="w-5 h-5"></i>
-                </button>
+                <!-- Search and Filters -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <input type="text" id="report-search" placeholder="Search by student name or ID..."
+                            class="w-full rounded-lg px-4 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;"
+                            oninput="debouncedSearch()">
+                    </div>
+                    <div>
+                        <select id="filter-class" onchange="loadReports()"
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">All Classes</option>
+                            <option value="FORM 1">FORM 1</option>
+                            <option value="FORM 2">FORM 2</option>
+                            <option value="FORM 3">FORM 3</option>
+                            <option value="FORM 4">FORM 4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="filter-term" onchange="loadReports()"
+                            class="w-full rounded-lg px-3 py-2.5 text-sm"
+                            style="border:1px solid #cbd5e1;color:#1e293b;">
+                            <option value="">All Terms</option>
+                            <option value="First Term">First Term</option>
+                            <option value="Second Term">Second Term</option>
+                            <option value="Third Term">Third Term</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            <p class="text-xs text-slate-400 font-medium text-center italic px-4">
-                <i data-lucide="shield-check" class="w-3 h-3 inline mr-1"></i> Data is retrieved securely from the school's local database.
-            </p>
-        </div>
+            <!-- Loading -->
+            <div id="reports-loading" class="text-center py-20">
+                <div class="spinner" style="width:28px;height:28px;border-width:3px;margin:0 auto;display:block;"></div>
+                <p class="mt-4 text-sm font-semibold" style="color:#64748b;">Loading reports...</p>
+            </div>
 
-        <!-- Results View -->
-        <div id="results-view" class="hidden space-y-4 sm:space-y-6 fade-in">
-            <!-- Back Button -->
-            <button onclick="showLookup()" class="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-indigo-600 active:text-indigo-700 uppercase tracking-widest transition-colors mb-2 min-h-[44px]">
-                <i data-lucide="chevron-left" class="w-4 h-4"></i> Back to Login
-            </button>
+            <!-- Class Folders -->
+            <div id="class-folders-container" class="space-y-6">
+                <!-- Dynamically populated class sections -->
+            </div>
 
-            <!-- Student Summary Card -->
-            <div class="glass-card rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-l-4 sm:border-l-8 border-l-indigo-600">
-                <div class="flex items-center gap-3 sm:gap-5">
-                    <div id="student-avatar" class="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-lg sm:text-2xl uppercase shadow-inner flex-shrink-0">JD</div>
-                    <div class="min-w-0 flex-1">
-                        <h2 id="student-name-display" class="font-display text-lg sm:text-2xl font-black text-slate-900 uppercase truncate">John Doe</h2>
-                        <div class="flex flex-wrap gap-2 sm:gap-4 mt-1">
-                            <span class="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">
-                                <i data-lucide="key" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-400"></i> <span id="student-id-display" class="text-slate-900">LID1234</span>
-                            </span>
-                            <span class="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">
-                                <i data-lucide="graduation-cap" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-400"></i> <span id="student-class-display" class="text-slate-900">FORM 4</span>
-                            </span>
+            <!-- Empty State -->
+            <div id="reports-empty-state" class="text-center py-20 hidden">
+                <i data-lucide="inbox" style="width:64px;height:64px;color:#cbd5e1;margin:0 auto;display:block;"></i>
+                <p class="mt-4 text-lg font-semibold" style="color:#64748b;">No reports found</p>
+                <p class="text-sm mt-2" style="color:#94a3b8;">Try a different search or filter</p>
+            </div>
+
+            <!-- Footer -->
+            <div class="text-center py-8">
+                <p class="text-xs" style="color:#94a3b8;">
+                    <i data-lucide="shield-check" style="width:12px;height:12px;display:inline;margin-right:4px;"></i>
+                    LIDOMA PRIVATE SECONDARY SCHOOL &mdash; officially generated electronic reports
+                </p>
+            </div>
+        </main>
+
+        <!-- Report View Modal -->
+        <div id="view-report-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center no-print"
+            style="background:rgba(15,23,42,0.75);">
+            <div class="rounded-2xl p-6 max-w-4xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto modal-content"
+                style="background:#ffffff;border:1px solid #e2e8f0;">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i data-lucide="eye" style="width:20px;height:20px;color:#4f46e5;"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-display text-lg font-bold" style="color:#0f172a;">Report Details</h3>
+                            <p class="text-xs" style="color:#64748b;">Student performance summary</p>
                         </div>
                     </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="closeViewReportModal()"
+                            class="rounded-lg p-2 transition-colors hover:bg-slate-100">
+                            <i data-lucide="x" style="width:20px;height:20px;color:#64748b;"></i>
+                        </button>
+                        <button id="btn-download-viewed-report"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-colors"
+                            style="background:#1e293b;color:#fff;">
+                            <i data-lucide="download" style="width:16px;height:16px;"></i> Download PDF
+                        </button>
+                    </div>
                 </div>
-                <div class="flex flex-col items-start md:items-end gap-1.5">
-                    <span id="current-term-badge" class="bg-indigo-600 text-white text-[9px] sm:text-[10px] font-black px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-widest">TERM 1 (2025/2026)</span>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase italic mt-1">Status: Results Released</p>
-                    <button id="btn-print" class="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-colors min-h-[44px]" title="Print Report">
-                        <i data-lucide="printer" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i> Print
-                    </button>
+                <div id="view-report-content" class="space-y-4">
+                    <!-- Content will be populated dynamically -->
                 </div>
-            </div>
-
-            <!-- Term Sections (generated by JavaScript) -->
-            <div id="results-sections" class="space-y-4 sm:space-y-6">
-                <!-- Dynamic per-term cards -->
-            </div>
-
-            <!-- Grading Scale Card -->
-            <div class="glass-card rounded-2xl p-4 sm:p-6 shadow-sm">
-                <h3 class="font-display text-sm font-black text-slate-900 uppercase mb-3 sm:mb-4 tracking-widest flex items-center gap-2">
-                    <i data-lucide="info" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600"></i> Grading Guide
-                </h3>
-                <div id="grading-guide-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
             </div>
         </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="w-full py-6 sm:py-8 border-t border-slate-200 bg-white">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-3 sm:gap-4">
-            <p id="footer-school-name" class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest text-center">LIDOMA PRIVATE SECONDARY SCHOOL</p>
-            <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <a href="#" class="hover:text-indigo-600 active:text-indigo-700 transition-colors">Privacy Policy</a>
-                <span class="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-slate-200"></span>
-                <a href="#" class="hover:text-indigo-600 active:text-indigo-700 transition-colors">Support</a>
-                <span class="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-slate-200"></span>
-                <span class="text-slate-300">&copy; 2026 OFFICIAL</span>
-            </div>
-        </div>
-    </footer>
+    </div>
 
     <script>
-        // ========== STATE & CONFIG ==========
-        const STORAGE_KEY = 'lidoma_local_db';
-        const STUDENT_KEY = 'lidoma_students';
-        const SETTINGS_KEY = 'lidoma_settings';
-        const LOGO_KEY = 'lidoma_logo_base64';
-
-        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        // ========== CONFIG ==========
+        const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
             ? 'http://localhost:8787'
-            : 'https://lidoma-backend.onrender.com';
+            : 'https://lidoma.onrender.com';
 
-        // Keep-alive ping every 14 minutes to prevent Render free tier cold starts
-        setInterval(() => fetch(API_BASE + '/api/health').catch(() => {}), 14 * 60 * 1000);
+        let allReports = [];
+        let currentViewedReport = null;
 
-        let allRecords = [];
-        let students = [];
-        let currentStudent = null;
-
-        // ========== CORE LOGIC ==========
-        function isForm1Or2Class(studentClass) {
-            return ['FORM 1', 'FORM 2'].includes(studentClass);
-        }
-
+        // ========== GRADING LOGIC ==========
         function calcGrade(score, studentClass) {
-            if (isForm1Or2Class(studentClass)) {
+            const isForm1Or2 = studentClass === 'FORM 1' || studentClass === 'FORM 2';
+            if (isForm1Or2) {
                 if (score >= 80) return { grade: 'A', points: 1, result: 'PASS' };
                 if (score >= 70) return { grade: 'B', points: 1, result: 'PASS' };
                 if (score >= 60) return { grade: 'C', points: 1, result: 'PASS' };
                 if (score >= 50) return { grade: 'D', points: 1, result: 'PASS' };
                 return { grade: 'F', points: 0, result: 'FAIL' };
+            } else {
+                if (score >= 90) return { grade: '1', points: 1, result: 'DIST' };
+                if (score >= 80) return { grade: '2', points: 2, result: 'DIST' };
+                if (score >= 70) return { grade: '3', points: 3, result: 'STRONG CREDIT' };
+                if (score >= 66) return { grade: '4', points: 4, result: 'CRED' };
+                if (score >= 60) return { grade: '5', points: 5, result: 'CRED' };
+                if (score >= 50) return { grade: '6', points: 6, result: 'CRED' };
+                if (score >= 46) return { grade: '7', points: 7, result: 'PASS' };
+                if (score >= 40) return { grade: '8', points: 8, result: 'PASS' };
+                return { grade: '9', points: 9, result: 'FAIL' };
             }
-
-            if (score >= 90) return { grade: '1', points: 1, result: 'DIST' };
-            if (score >= 80) return { grade: '2', points: 2, result: 'DIST' };
-            if (score >= 70) return { grade: '3', points: 3, result: 'STRONG CREDIT' };
-            if (score >= 66) return { grade: '4', points: 4, result: 'CRED' };
-            if (score >= 60) return { grade: '5', points: 5, result: 'CRED' };
-            if (score >= 50) return { grade: '6', points: 6, result: 'CRED' };
-            if (score >= 46) return { grade: '7', points: 7, result: 'PASS' };
-            if (score >= 40) return { grade: '8', points: 8, result: 'PASS' };
-            return { grade: '9', points: 9, result: 'FAIL' };
         }
 
-        function resultColor(res) {
-            if (res === 'DIST') return '#059669';
-            if (res === 'STRONG CREDIT') return '#4f46e5';
-            if (res === 'CRED') return '#1d4ed8';
-            if (res === 'PASS') return '#d97706';
-            return '#dc2626';
-        }
-
-        function resultBg(res) {
-            if (res === 'DIST') return '#ecfdf5';
-            if (res === 'STRONG CREDIT') return '#eef2ff';
-            if (res === 'CRED') return '#eff6ff';
-            if (res === 'PASS') return '#fffbeb';
-            return '#fef2f2';
-        }
-
-        function getGradingGuideMarkup(studentClass) {
-            if (isForm1Or2Class(studentClass)) {
+        function getOfficialGradingScaleMarkup(isForm1Or2) {
+            if (isForm1Or2) {
                 return `
-                    <div class="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-100">
-                        <span class="text-[10px] font-black text-emerald-700 uppercase">Grade A</span>
-                        <span class="text-[10px] font-black text-emerald-700">80-100</span>
-                    </div>
-                    <div class="flex items-center justify-between p-2 rounded-lg bg-indigo-50 border border-indigo-100">
-                        <span class="text-[10px] font-black text-indigo-700 uppercase">Grade B</span>
-                        <span class="text-[10px] font-black text-indigo-700 uppercase">70-79</span>
-                    </div>
-                    <div class="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-100">
-                        <span class="text-[10px] font-black text-blue-700 uppercase">Grade C</span>
-                        <span class="text-[10px] font-black text-blue-700 uppercase">60-69</span>
-                    </div>
-                    <div class="flex items-center justify-between p-2 rounded-lg bg-amber-50 border border-amber-100">
-                        <span class="text-[10px] font-black text-amber-700 uppercase">Grade D</span>
-                        <span class="text-[10px] font-black text-amber-700 uppercase">50-59</span>
-                    </div>
-                    <div class="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-100">
-                        <span class="text-[10px] font-black text-red-700 uppercase">Grade F</span>
-                        <span class="text-[10px] font-black text-red-700 uppercase">0-49</span>
-                    </div>
+                        <table class="w-full border-collapse border border-slate-200 text-[9px] rounded-lg overflow-hidden shadow-sm">
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase w-20 text-slate-500">GRADE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-emerald-700">A</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-indigo-700">B</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-blue-700">C</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">D</td>
+                                <td class="p-1.5 text-center font-bold text-red-600 bg-red-50/30">F</td>
+                            </tr>
+                            <tr class="text-slate-500 font-medium">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase text-slate-400">RANGE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">80-100</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">70-79</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">60-69</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">50-59</td>
+                                <td class="p-1.5 text-center bg-red-50/30">0-49</td>
+                            </tr>
+                        </table>
                 `;
             }
-
             return `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-100">
-                    <span class="text-[10px] font-black text-emerald-700 uppercase">Grade 1-2</span>
-                    <span class="text-[10px] font-black text-emerald-700">DISTINCTION</span>
-                </div>
-                <div class="flex items-center justify-between p-2 rounded-lg bg-indigo-50 border border-indigo-100">
-                    <span class="text-[10px] font-black text-indigo-700 uppercase">Grade 3</span>
-                    <span class="text-[10px] font-black text-indigo-700 uppercase">STRONG CREDIT</span>
-                </div>
-                <div class="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-100">
-                    <span class="text-[10px] font-black text-blue-700 uppercase">Grade 4-6</span>
-                    <span class="text-[10px] font-black text-blue-700 uppercase">CREDIT</span>
-                </div>
-                <div class="flex items-center justify-between p-2 rounded-lg bg-amber-50 border border-amber-100">
-                    <span class="text-[10px] font-black text-amber-700 uppercase">Grade 7-8</span>
-                    <span class="text-[10px] font-black text-amber-700 uppercase">PASS</span>
-                </div>
-                <div class="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-100">
-                    <span class="text-[10px] font-black text-red-700 uppercase">Grade 9</span>
-                    <span class="text-[10px] font-black text-red-700 uppercase">FAIL</span>
-                </div>
+                        <table class="w-full border-collapse border border-slate-200 text-[9px] rounded-lg overflow-hidden shadow-sm">
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase w-20 text-slate-500">GRADE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">1</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">2</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">3</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">4</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">5</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold">6</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">7</td>
+                                <td class="p-1.5 text-center border-r border-slate-200 font-bold text-amber-600">8</td>
+                                <td class="p-1.5 text-center font-bold text-red-600 bg-red-50/30">9</td>
+                            </tr>
+                            <tr class="text-slate-500 font-medium">
+                                <td class="p-1.5 font-black border-r border-slate-200 uppercase text-slate-400">RANGE</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">90-100</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">80-89</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">70-79</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">66-69</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">60-65</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">50-59</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">46-49</td>
+                                <td class="p-1.5 text-center border-r border-slate-200">40-45</td>
+                                <td class="p-1.5 text-center bg-red-50/30">0-39</td>
+                            </tr>
+                        </table>
             `;
         }
 
-        // ========== APP LOGIC ==========
-        function init() {
-            loadData();
-
-            // Lookup Handler
-            document.getElementById('btn-lookup').onclick = handleLookup;
-            
-            // Enter key handlers
-            ['lookup-name', 'lookup-id'].forEach(id => {
-                document.getElementById(id).onkeypress = (e) => {
-                    if (e.key === 'Enter') handleLookup();
-                };
-            });
-
-            // Listen for changes in LIDOMA.HTML (Teachers app)
-            window.addEventListener('storage', (e) => {
-                if ([STORAGE_KEY, STUDENT_KEY, SETTINGS_KEY, LOGO_KEY].includes(e.key)) {
-                    loadData();
-                    if (currentStudent) showResults();
-                }
-            });
-
-            lucide.createIcons();
+        function resultColor(result) {
+            const m = {
+                'DIST': '#059669',
+                'STRONG CREDIT': '#2563eb',
+                'CRED': '#4f46e5',
+                'PASS': '#d97706',
+                'FAIL': '#dc2626'
+            };
+            return m[result] || '#64748b';
         }
 
-        function loadData() {
-            // Load Data from the same keys used in LIDOMA.HTML
-            allRecords = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            students = JSON.parse(localStorage.getItem(STUDENT_KEY) || '[]');
-            const settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-            const logo = localStorage.getItem(LOGO_KEY);
+        // ========== REPORT CARD (identical to the school system) ==========
+        function buildReportCardHTML(report) {
+            const d = report.report_data;
+            const isForm1Or2 = d.is_form1_or_2;
+            const logoDataUrl = localStorage.getItem('lidoma_logo_base64') || '';
+            const subjects = d.subjects || [];
+            const sn = d.school_name || 'LIDOMA PRIVATE SECONDARY SCHOOL';
+            const ay = report.academic_year;
 
-            if (settings.school_name) {
-                document.getElementById('header-school-name').textContent = settings.school_name;
-                document.getElementById('footer-school-name').textContent = settings.school_name;
+            const autoComment = (res) => {
+                if (res === 'DIST') return 'Outstanding Performance';
+                if (res === 'STRONG CREDIT') return 'Excellent Achievement';
+                if (res === 'CRED') return 'Very Good Progress';
+                if (res === 'PASS') return 'Satisfactory; Needs Focus';
+                return 'Requires Urgent Attention';
+            };
+
+            const rows = subjects.map((s, i) => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td class="px-3 py-2 text-[11px] text-center border-r border-slate-100 font-medium">${i + 1}</td>
+                    <td class="px-3 py-2 text-[11px] font-bold border-r border-slate-100 uppercase text-slate-700">${s.subject}</td>
+                    <td class="text-center px-3 py-2 text-[12px] font-black border-r border-slate-100 text-indigo-900 bg-slate-50/50">${s.score}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-bold">${s.grade}</td>
+                    <td class="text-center px-3 py-2 text-[11px] border-r border-slate-100 font-black uppercase" style="color:${resultColor(s.result)}">${s.result}</td>
+                    <td class="px-3 py-2 text-[10px] italic font-medium" style="color:#64748b;">${s.comment || autoComment(s.result)}</td>
+                </tr>`).join('');
+
+            let aggregate;
+            if (isForm1Or2) {
+                const avgAll = subjects.reduce((a, b) => a + b.score, 0) / (subjects.length || 1);
+                aggregate = 'GRADE ' + calcGrade(Math.round(avgAll), 'FORM 1').grade;
+            } else {
+                const rawAgg = d.aggregate || report.aggregate_points || 0;
+                aggregate = rawAgg >= 99 ? 'FAIL (ENG)' : rawAgg;
             }
 
-            if (logo) {
-                portalLogo = logo;
-                document.getElementById('portal-logo').src = logo;
+            const isDataURL = logoDataUrl.startsWith('data:');
+            const logoHTML = isDataURL
+                ? `<img src="${logoDataUrl}" alt="Logo" class="h-20 w-20 object-contain drop-shadow-sm" onerror="this.style.display='none'">`
+                : `<img src="image.png" alt="Logo" class="h-20 w-20 object-contain drop-shadow-sm" onerror="this.style.display='none'">`;
+
+            return `
+                <div id="report-card-print" class="flex flex-col h-full text-slate-900" style="font-family:'DM Sans',sans-serif;font-size:13px;">
+                    <div class="flex items-center gap-6 border-b-2 border-indigo-600 pb-5 mb-5">
+                        ${logoHTML}
+                        <div class="flex-1 text-left">
+                            <h1 class="font-display text-2xl font-black uppercase tracking-tight leading-none mb-1" style="color:#1e1b4b;">${sn}</h1>
+                            <div class="flex items-center gap-3 mb-2">
+                                <h2 class="text-base font-black text-indigo-600 uppercase tracking-[0.1em]">PROGRESS REPORT CARD</h2>
+                                <span class="h-px flex-1 bg-slate-200"></span>
+                            </div>
+                            <div class="flex gap-6 text-[11px] font-black text-slate-500 uppercase">
+                                <span>YEAR: <span class="text-indigo-900 border-b-2 border-indigo-100">${ay}</span></span>
+                                <span>TERM: <span class="text-indigo-900 border-b-2 border-indigo-100">${report.term.toUpperCase()}</span></span>
+                                <span>CLASS: <span class="text-indigo-900 border-b-2 border-indigo-100">${report.student_class.toUpperCase()}</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-5 flex items-center justify-between bg-slate-50 border-y border-slate-200 py-3 px-4 rounded-sm">
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student Name:</span>
+                            <span class="text-xl font-black text-slate-900 uppercase tracking-tight">${report.student_name}</span>
+                        </div>
+                        <div class="flex items-baseline gap-3">
+                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Student ID:</span>
+                            <span class="text-base font-mono font-black text-indigo-700 bg-white px-3 py-0.5 border border-indigo-100 rounded-full shadow-sm">${report.student_id}</span>
+                        </div>
+                    </div>
+                    <div class="border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900 text-white">
+                                    <th class="px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-12">No#</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700">SUBJECT</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-20">SCORE (%)</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-16">GRADE</th>
+                                    <th class="text-center px-3 py-2.5 text-[10px] font-black uppercase border-r border-slate-700 w-32">RESULT</th>
+                                    <th class="text-left px-3 py-2.5 text-[10px] font-black uppercase">TEACHER'S COMMENT</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">${rows}</tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between border-2 border-indigo-100 p-4 bg-indigo-50/30 rounded-lg shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-md">
+                                <i data-lucide="award" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-black text-indigo-900 uppercase tracking-widest block">${isForm1Or2 ? 'OVERALL GRADE' : 'AGGREGATE FOR BEST 6 SUBJECTS'}</span>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase leading-none">Official performance metric</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white px-6 py-2 rounded-full border-2 border-indigo-200 shadow-inner">
+                            <span class="text-2xl font-black text-indigo-700">${aggregate}</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${isForm1Or2 ? 'GRADE' : 'POINTS'}</span>
+                        </div>
+                    </div>
+                    <div class="mt-auto pt-6">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">OFFICIAL GRADING SCALE</span>
+                            <span class="h-px flex-1 bg-slate-100"></span>
+                        </div>
+                        ${getOfficialGradingScaleMarkup(isForm1Or2)}
+                    </div>
+                    <div class="mt-6 border-t-2 border-slate-100 pt-4 flex justify-between items-end">
+                        <div class="text-left">
+                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-widest leading-none mb-1">Next Term Resumption:</p>
+                            <p class="text-sm font-black text-slate-900 uppercase">20th APRIL, 2026</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-slate-400 italic">This is an electronically generated official report card of ${sn}.</p>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // ========== ARCHIVE VIEW ==========
+        async function loadReports() {
+            const search = document.getElementById('report-search').value;
+            const studentClass = document.getElementById('filter-class').value;
+            const term = document.getElementById('filter-term').value;
+
+            try {
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+                if (studentClass) params.append('student_class', studentClass);
+                if (term) params.append('term', term);
+
+                const res = await fetch(`${API_BASE}/api/public/reports?${params}`);
+                if (!res.ok) throw new Error('Failed to load reports');
+                allReports = await res.json();
+                renderReportsByClass(allReports);
+            } catch (error) {
+                document.getElementById('reports-loading').classList.add('hidden');
+                showToast('Failed to load reports: ' + error.message, 'error');
             }
         }
 
-        async function handleLookup() {
-            const nameInp = document.getElementById('lookup-name').value.trim();
-            const idInp = document.getElementById('lookup-id').value.trim().toUpperCase();
+        function renderReportsByClass(reports) {
+            const container = document.getElementById('class-folders-container');
+            const emptyState = document.getElementById('reports-empty-state');
+            const loading = document.getElementById('reports-loading');
+            const classes = ['FORM 1', 'FORM 2', 'FORM 3', 'FORM 4'];
 
-            if (!nameInp || !idInp) {
-                alert('Please enter both student name and ID.');
+            container.innerHTML = '';
+            loading.classList.add('hidden');
+
+            if (reports.length === 0) {
+                emptyState.classList.remove('hidden');
                 return;
             }
 
-            // Live lookup from the backend first
-            try {
-                const res = await fetch(API_BASE + '/api/parent/lookup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student_id: idInp, student_name: nameInp })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    const st = data.student;
-                    currentStudent = { id: st.student_id, name: st.name, class: st.student_class };
-                    allRecords = data.records || [];
-                    reports = data.reports || [];
-                    if (data.settings && data.settings.school_name) {
-                        document.getElementById('header-school-name').textContent = data.settings.school_name;
-                        document.getElementById('footer-school-name').textContent = data.settings.school_name;
-                    }
-                    if (data.logo_data_url) {
-                        portalLogo = data.logo_data_url;
-                        document.getElementById('portal-logo').src = data.logo_data_url;
-                    }
-                    showResults();
-                    return;
-                }
-            } catch (e) {
-                console.warn('Backend lookup unavailable, using local cache:', e);
-            }
+            emptyState.classList.add('hidden');
 
-            // Fallback: local cache (offline)
-            const nameLower = nameInp.toLowerCase();
-            const student = students.find(s =>
-                s.id === idInp && s.name.toLowerCase().includes(nameLower)
-            );
+            classes.forEach(cls => {
+                const classReports = reports.filter(r => r.student_class === cls);
+                if (classReports.length === 0) return;
 
-            if (student) {
-                currentStudent = student;
-                showResults();
-            } else {
-                alert('Student not found. Please verify the Name and ID.');
-            }
-        }
+                const folderId = `class-${cls.replace(/\s+/g, '-').toLowerCase()}`;
+                const chevronId = `chevron-${cls.replace(/\s+/g, '-').toLowerCase()}`;
 
-        function showResults() {
-            document.getElementById('lookup-screen').classList.add('hidden');
-            document.getElementById('results-view').classList.remove('hidden');
-
-            // Header Info
-            document.getElementById('student-name-display').textContent = currentStudent.name;
-            document.getElementById('student-id-display').textContent = currentStudent.id;
-            document.getElementById('student-class-display').textContent = currentStudent.class;
-            document.getElementById('student-avatar').textContent = currentStudent.name.split(' ').map(n => n[0]).join('').substring(0, 2);
-
-            // Group records into term + year categories
-            const groups = groupResults(allRecords);
-            (reports || []).forEach(rep => {
-                const g = groups.find(x => x.term === rep.term && x.year === rep.academic_year);
-                if (g) g.report = rep;
-            });
-
-            const badge = document.getElementById('current-term-badge');
-            if (groups.length) {
-                badge.textContent = `${termShort(groups[0].term)} TERM (${groups[0].year})`;
-            } else {
-                badge.textContent = 'NO RESULTS';
-            }
-
-            const container = document.getElementById('results-sections');
-            if (!groups.length) {
-                container.innerHTML = `
-                    <div class="glass-card rounded-2xl p-8 sm:p-10 text-center">
-                        <i data-lucide="search-x" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
-                        <p class="text-sm font-bold text-slate-500">No results found for this student.</p>
-                        <p class="text-xs text-slate-400 mt-1">Check back when the school releases the reports.</p>
-                    </div>`;
-            } else {
-                container.innerHTML = groups.map((g, i) => renderTermSection(g, i === 0)).join('');
-            }
-
-            // Grading guide for the student's class
-            document.getElementById('grading-guide-content').innerHTML = getGradingGuideMarkup(currentStudent.class);
-
-            // Print Handler
-            document.getElementById('btn-print').onclick = () => window.print();
-
-            lucide.createIcons();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-
-            // Chart for the latest term
-            if (groups.length && groups[0].records.length) {
-                setTimeout(() => {
-                    const box = document.getElementById('chart-box');
-                    if (box) {
-                        box.innerHTML = renderChartInner(groups[0].records);
-                        setTimeout(() => box.querySelectorAll('.bar-animate').forEach(b => b.style.height = b.dataset.height), 100);
-                    }
-                }, 100);
-            }
-        }
-
-        function showLookup() {
-            document.getElementById('results-view').classList.add('hidden');
-            document.getElementById('lookup-screen').classList.remove('hidden');
-            currentStudent = null;
-        }
-
-        // ========== TERM CATEGORIES ==========
-        const TERM_ORDER = ['Third Term', 'Second Term', 'First Term'];
-        let reports = [];
-        let portalLogo = '';
-
-        function termShort(t) {
-            return String(t || '').replace(/\s*Term$/i, '').toUpperCase();
-        }
-
-        function esc(s) {
-            return String(s == null ? '' : s)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
-
-        function groupResults(records) {
-            const map = {};
-            records.forEach(r => {
-                const key = (r.term || '') + '\u0000' + (r.academic_year || '');
-                if (!map[key]) map[key] = { term: r.term, year: r.academic_year, records: [], report: null };
-                map[key].records.push(r);
-            });
-            const groups = Object.values(map);
-            groups.sort((a, b) => {
-                const ia = TERM_ORDER.indexOf(a.term);
-                const ib = TERM_ORDER.indexOf(b.term);
-                const d = (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-                return d !== 0 ? d : String(b.year).localeCompare(String(a.year));
-            });
-            return groups;
-        }
-
-        function computeTermAggregate(recs) {
-            if (!recs.length) return { label: 'Aggregate', value: 'N/A', unit: '' };
-            if (isForm1Or2Class(currentStudent.class)) {
-                const avg = recs.reduce((a, r) => a + r.score, 0) / recs.length;
-                return { label: 'Overall Grade', value: calcGrade(avg, currentStudent.class).grade, unit: 'Grade' };
-            }
-            const eng = recs.find(r => String(r.subject).trim().toLowerCase() === 'english');
-            if (!eng) return { label: 'Academic Points', value: 'N/A', unit: 'Points' };
-            const eg = calcGrade(eng.score, currentStudent.class);
-            if (eg.result === 'FAIL') return { label: 'Academic Points', value: 'FAIL (ENG)', unit: 'Points' };
-            const pts = recs.filter(r => String(r.subject).trim().toLowerCase() !== 'english')
-                .map(r => calcGrade(r.score, currentStudent.class).points).sort((a, b) => a - b);
-            return { label: 'Academic Points', value: eg.points + pts.slice(0, 5).reduce((a, b) => a + b, 0), unit: 'Points' };
-        }
-
-        function logoHtml() {
-            return portalLogo
-                ? `<div class="w-10 h-10 sm:w-14 sm:h-14 rounded-lg bg-white border border-slate-100 shadow-sm flex items-center justify-center overflow-hidden flex-shrink-0"><img src="${portalLogo}" alt="School Logo" class="w-full h-full object-contain"></div>`
-                : '';
-        }
-
-        function renderReportCard(report) {
-            const rd = report.report_data || {};
-            const subs = (rd.subjects || []).map(s => `
-                <tr class="border-b border-slate-50">
-                    <td class="px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-black text-slate-900 uppercase">${esc(s.subject)}</td>
-                    <td class="px-3 sm:px-4 py-2 sm:py-2.5 text-center text-xs sm:text-sm font-black text-slate-900">${s.score}%</td>
-                    <td class="px-3 sm:px-4 py-2 sm:py-2.5 text-center"><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] sm:text-xs font-black text-slate-700 border border-slate-200">${esc(s.grade)}</span></td>
-                    <td class="px-3 sm:px-4 py-2 sm:py-2.5 text-center"><span class="status-pill" style="background:${resultBg(s.result)};color:${resultColor(s.result)};">${esc(s.result)}</span></td>
-                    <td class="px-3 sm:px-4 py-2 sm:py-2.5 text-[10px] sm:text-xs text-slate-400 italic max-w-[110px] sm:max-w-[180px] truncate">${esc(s.comment || '')}</td>
-                </tr>`).join('');
-
-            const aggRow = isForm1Or2Class(currentStudent.class) ? '' : `
-                <span class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregate: <span class="text-indigo-600">${report.aggregate_points != null ? Number(report.aggregate_points).toFixed(1) : ''}</span></span>`;
-
-            return `
-            <div class="border-b border-slate-100 bg-white">
-                <div class="px-4 sm:px-6 py-4 sm:py-5">
-                    <div class="flex items-center justify-center gap-3 sm:gap-4 mb-3">
-                        ${logoHtml()}
-                        <div>
-                            <p class="font-display text-sm sm:text-lg font-black text-slate-900 uppercase text-center">${esc(rd.school_name || 'LIDOMA PRIVATE SECONDARY SCHOOL')}</p>
-                            <p class="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-widest text-center">Official Progress Report</p>
+                const folderHTML = `
+                    <div class="rounded-xl overflow-hidden" style="background:#ffffff;border:1px solid #e2e8f0;">
+                        <div class="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                            onclick="toggleClassFolder('${folderId}', '${chevronId}')">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="chevron-down" id="${chevronId}" style="width:20px;height:20px;color:#64748b;"></i>
+                                <i data-lucide="folder" style="width:24px;height:24px;color:#4f46e5;"></i>
+                                <div>
+                                    <h3 class="font-display text-lg font-bold" style="color:#1e293b;">${cls}</h3>
+                                    <p class="text-xs" style="color:#64748b;">${classReports.length} report${classReports.length !== 1 ? 's' : ''}</p>
+                                </div>
+                            </div>
+                            <button onclick="event.stopPropagation(); downloadClassReports('${cls}')"
+                                class="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors"
+                                style="background:#059669;color:#ffffff;">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="download" style="width:14px;height:14px;"></i>
+                                    Download All
+                                </span>
+                            </button>
+                        </div>
+                        <div id="${folderId}" class="class-folder-content px-6 pb-4">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr style="background:#f8fafc;">
+                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Pos</th>
+                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student Name</th>
+                                            <th class="text-left px-4 py-3 font-semibold" style="color:#64748b;">Student ID</th>
+                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Term</th>
+                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Subjects</th>
+                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Average</th>
+                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Aggregate</th>
+                                            <th class="text-center px-4 py-3 font-semibold" style="color:#64748b;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${classReports.map(r => createReportRow(r)).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-[10px] sm:text-xs mb-3">
-                        <div><span class="text-slate-400 font-black uppercase">Student:</span> <span class="font-bold uppercase">${esc(currentStudent.name)}</span></div>
-                        <div><span class="text-slate-400 font-black uppercase">ID:</span> <span class="font-bold">${esc(currentStudent.id)}</span></div>
-                        <div><span class="text-slate-400 font-black uppercase">Class:</span> <span class="font-bold">${esc(currentStudent.class)}</span></div>
-                        <div><span class="text-slate-400 font-black uppercase">Term:</span> <span class="font-bold">${esc(report.term)}</span></div>
-                        <div><span class="text-slate-400 font-black uppercase">Year:</span> <span class="font-bold">${esc(report.academic_year)}</span></div>
-                        <div><span class="text-slate-400 font-black uppercase">Position:</span> <span class="font-bold">${report.position ? report.position : '&mdash;'}</span></div>
-                    </div>
-                    <div class="rounded-xl border border-slate-100 overflow-x-auto">
-                        <table class="w-full text-left border-collapse min-w-[480px]">
-                            <thead>
-                                <tr class="bg-slate-900 text-white">
-                                    <th class="px-3 sm:px-4 py-2.5 text-[9px] font-black uppercase tracking-widest">Subject</th>
-                                    <th class="px-3 sm:px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-center">Score</th>
-                                    <th class="px-3 sm:px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-center">Grade</th>
-                                    <th class="px-3 sm:px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-center">Result</th>
-                                    <th class="px-3 sm:px-4 py-2.5 text-[9px] font-black uppercase tracking-widest">Comment</th>
-                                </tr>
-                            </thead>
-                            <tbody>${subs}</tbody>
-                        </table>
-                    </div>
-                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Subjects: <span class="text-slate-900">${report.total_subjects}</span></span>
-                        <span class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Average: <span class="text-slate-900">${report.average_score != null ? Number(report.average_score).toFixed(1) + '%' : ''}</span></span>
-                        ${aggRow}
-                    </div>
-                </div>
-            </div>`;
+                `;
+                container.insertAdjacentHTML('beforeend', folderHTML);
+            });
+
+            lucide.createIcons();
         }
 
-        function renderTermSection(g, showChart) {
-            const avg = g.records.reduce((a, r) => a + r.score, 0) / g.records.length;
-            const agg = computeTermAggregate(g.records);
-            const hasReport = !!g.report;
-
-            const rows = g.records.map(r => {
-                const gr = calcGrade(r.score, currentStudent.class);
-                return `
-                    <tr class="hover:bg-slate-50/50 transition-colors">
-                        <td class="px-3 sm:px-5 py-3 sm:py-4">
-                            <p class="text-xs sm:text-sm font-black text-slate-900 uppercase">${esc(r.subject)}</p>
-                            <p class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase italic mt-0.5 truncate max-w-[150px] sm:max-w-[220px]">${esc(r.teacher_comment || 'Satisfactory progress.')}</p>
-                        </td>
-                        <td class="px-3 sm:px-5 py-3 sm:py-4 text-center"><span class="text-sm sm:text-base font-black text-slate-900">${r.score}%</span></td>
-                        <td class="px-3 sm:px-5 py-3 sm:py-4 text-center"><span class="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-slate-100 text-[10px] sm:text-xs font-black text-slate-700 border border-slate-200">${gr.grade}</span></td>
-                        <td class="px-3 sm:px-5 py-3 sm:py-4"><span class="status-pill" style="background:${resultBg(gr.result)};color:${resultColor(gr.result)};">${gr.result}</span></td>
-                    </tr>`;
-            }).join('');
-
-            const downloadBtn = hasReport ? `
-                <button onclick="downloadReport(this,'${esc(g.term)}','${esc(g.year)}')" class="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all min-h-[44px]">
-                    <i data-lucide="download" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i> Download Report
-                </button>` : '';
-
-            const reportCard = hasReport ? renderReportCard(g.report) : '';
-            const chartCard = showChart ? `
-                <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="font-display text-sm sm:text-base font-black text-slate-900 uppercase flex items-center gap-2">
-                            <i data-lucide="bar-chart-3" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600"></i> ${termShort(g.term)} Performance
-                        </h3>
-                    </div>
-                    <div class="h-56 sm:h-64 flex items-stretch gap-0 overflow-x-auto"><div id="chart-box" class="flex-1 flex items-stretch gap-0 min-w-[520px]"></div></div>
-                </div>` : '';
+        function createReportRow(report) {
+            const isForm1Or2 = ['FORM 1', 'FORM 2'].includes(report.student_class);
+            const pos = report.position ? `#${report.position}` : '<span class="text-slate-400">-</span>';
+            const subjectsDisplay = report.total_subjects > 0
+                ? `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f0fdf4;color:#059669;">${report.total_subjects}</span>`
+                : `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#fef2f2;color:#dc2626;">No grades</span>`;
+            const aggBadge = report.aggregate_points >= 99
+                ? `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#fee2e2;color:#dc2626;">FAIL (ENG)</span>`
+                : `<span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#f5f3ff;color:#7c3aed;">${Number(report.aggregate_points || 0).toFixed(1)}</span>`;
 
             return `
-            <div class="glass-card rounded-xl sm:rounded-2xl shadow-sm overflow-hidden fade-in">
-                <div class="p-3 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-white">
-                    <h3 class="font-display text-sm sm:text-base font-black text-slate-900 uppercase flex items-center gap-2">
-                        <i data-lucide="clipboard-list" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600"></i>
-                        ${termShort(g.term)} TERM ${esc(g.year)}
-                    </h3>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="bg-slate-100 text-slate-700 text-[9px] sm:text-[10px] font-black px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-widest">${g.records.length} Subjects</span>
-                        ${downloadBtn}
-                    </div>
-                </div>
-                ${reportCard}
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse min-w-[560px]">
-                        <thead>
-                            <tr class="bg-slate-50/80">
-                                <th class="px-3 sm:px-5 py-3 sm:py-4 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Subject</th>
-                                <th class="px-3 sm:px-5 py-3 sm:py-4 text-center text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Score</th>
-                                <th class="px-3 sm:px-5 py-3 sm:py-4 text-center text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Grade</th>
-                                <th class="px-3 sm:px-5 py-3 sm:py-4 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Result</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">${rows}</tbody>
-                    </table>
-                </div>
-                <div class="px-3 sm:px-5 py-3 sm:py-4 bg-slate-50/60 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
-                    <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                        <span class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Average Score</span>
-                        <span class="font-bold text-sm sm:text-base text-slate-900">${avg.toFixed(1)}%</span>
-                    </div>
-                    <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                        <span class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">${esc(agg.label)}</span>
-                        <span class="font-bold text-sm sm:text-base text-indigo-600">${esc(String(agg.value))}</span>
-                    </div>
-                </div>
-            </div>
-            ${chartCard}`;
+                <tr style="border-top:1px solid #f1f5f9;" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-3">${isForm1Or2 ? `<span class="font-bold ${report.position && report.position <= 3 ? 'text-indigo-600' : ''}">${pos}</span>` : pos}</td>
+                    <td class="px-4 py-3 font-medium" style="color:#1e293b;">${report.student_name}</td>
+                    <td class="px-4 py-3 font-mono text-xs" style="color:#64748b;">${report.student_id}</td>
+                    <td class="text-center px-4 py-3 text-xs" style="color:#64748b;">${report.term}</td>
+                    <td class="text-center px-4 py-3">${subjectsDisplay}</td>
+                    <td class="text-center px-4 py-3"><span class="inline-block px-2 py-0.5 rounded font-semibold text-xs" style="background:#eff6ff;color:#2563eb;">${Number(report.average_score || 0).toFixed(1)}%</span></td>
+                    <td class="text-center px-4 py-3">${aggBadge}</td>
+                    <td class="text-center px-4 py-3">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="viewReport(${report.id})" title="View" class="rounded-lg p-1.5 transition-colors" style="background:#eff6ff;color:#2563eb;"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
+                            <button onclick="downloadReportPdf(${report.id})" title="Download" class="rounded-lg p-1.5 transition-colors" style="background:#f0fdf4;color:#059669;"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
         }
 
-        async function downloadReport(btn, term, year) {
-            if (btn) { btn.disabled = true; btn.innerHTML = 'Preparing...'; }
+        function toggleClassFolder(folderId, chevronId) {
+            const content = document.getElementById(folderId);
+            const chevron = document.getElementById(chevronId);
+            if (!content) return;
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                chevron.setAttribute('data-lucide', 'chevron-down');
+            } else {
+                content.style.display = 'none';
+                chevron.setAttribute('data-lucide', 'chevron-right');
+            }
+            lucide.createIcons();
+        }
+
+        function findReport(id) {
+            return allReports.find(r => r.id === id);
+        }
+
+        // ========== VIEW MODAL ==========
+        async function viewReport(reportId) {
             try {
-                const res = await fetch(API_BASE + '/api/parent/report-pdf', {
+                const res = await fetch(`${API_BASE}/api/public/reports/${reportId}`);
+                if (!res.ok) throw new Error('Failed to load report');
+                const report = await res.json();
+                currentViewedReport = report;
+                const content = document.getElementById('view-report-content');
+                content.innerHTML = buildReportCardHTML(report);
+                const overlay = document.getElementById('view-report-overlay');
+                overlay.classList.remove('hidden');
+                document.getElementById('btn-download-viewed-report').onclick = () => downloadReportPdf(report.id, report);
+                lucide.createIcons({ nodes: [overlay] });
+            } catch (error) {
+                showToast('Failed to load report: ' + error.message, 'error');
+            }
+        }
+
+        function closeViewReportModal() {
+            document.getElementById('view-report-overlay').classList.add('hidden');
+        }
+
+        // ========== DOWNLOADS ==========
+        async function downloadReportPdf(reportId, reportObj) {
+            const report = reportObj || findReport(reportId);
+            if (!report) { showToast('Report not found', 'error'); return; }
+            if (!report.total_subjects) { showToast('This report has no grades to download', 'warning'); return; }
+            try {
+                showToast('Preparing PDF...', 'success');
+                const res = await fetch(`${API_BASE}/api/parent/report-pdf`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student_id: currentStudent.id, student_name: currentStudent.name, term: term, academic_year: year })
+                    body: JSON.stringify({
+                        student_id: report.student_id,
+                        student_name: report.student_name,
+                        term: report.term,
+                        academic_year: report.academic_year
+                    })
                 });
-                if (!res.ok) {
-                    let msg = 'Download failed.';
-                    try { const d = await res.json(); if (d.detail) msg = d.detail; } catch (e) {}
-                    throw new Error(msg);
-                }
+                if (!res.ok) throw new Error('Download failed');
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${currentStudent.name}_${term}_${year}_Report.pdf`;
+                a.download = `${report.student_name}_${report.term}_${report.academic_year}_Report.pdf`;
                 document.body.appendChild(a);
                 a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
-            } catch (e) {
-                alert('Could not download the report: ' + e.message);
-            } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i data-lucide="download" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i> Download Report';
-                    lucide.createIcons();
-                }
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Report downloaded!', 'success');
+            } catch (error) {
+                showToast('Failed to download: ' + error.message, 'error');
             }
         }
 
-        function renderChartInner(records) {
-            return `
-                <div class="flex flex-col justify-between h-full text-[10px] font-black text-slate-300 pr-4 border-r border-slate-100 pb-10">
-                    <span>100</span><span>80</span><span>60</span><span>40</span><span>20</span><span>0</span>
-                </div>
-                <div class="flex-1 flex items-end justify-around gap-4 h-full px-8 relative">
-                    <div class="absolute inset-0 flex flex-col justify-between pointer-events-none pb-10">
-                        <div class="border-b border-slate-50 w-full"></div>
-                        <div class="border-b border-slate-50 w-full"></div>
-                        <div class="border-b border-slate-50 w-full"></div>
-                        <div class="border-b border-slate-50 w-full"></div>
-                        <div class="border-b border-slate-50 w-full"></div>
-                        <div class="w-full"></div>
-                    </div>
-                    ${records.map((r, i) => {
-                        const pct = (r.score / 100) * 100;
-                        const g = calcGrade(r.score, currentStudent.class);
-                        const color = resultColor(g.result);
-                        return `
-                            <div class="flex flex-col items-center gap-3 flex-1 h-full justify-end z-10 group">
-                                <div class="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg -mb-1 z-20">${r.score}%</div>
-                                <div class="w-full max-w-[40px] min-w-[20px] rounded-t-xl shadow-lg shadow-indigo-500/10 bar-animate"
-                                     style="height:0; background:${color};"
-                                     data-height="calc(${pct}% - 40px)"></div>
-                                <div class="h-10 flex items-center justify-center pt-2">
-                                    <span class="text-[9px] font-black text-slate-400 uppercase text-center leading-tight truncate w-16" title="${esc(r.subject)}">${esc(r.subject)}</span>
-                                </div>
-                            </div>`;
-                    }).join('')}
-                </div>`;
+        async function downloadClassReports(className) {
+            const termFilter = document.getElementById('filter-term').value;
+            let classReports = allReports.filter(r => r.student_class === className);
+            if (termFilter) classReports = classReports.filter(r => r.term === termFilter);
+            classReports = classReports.filter(r => r.total_subjects > 0);
+
+            if (classReports.length === 0) {
+                showToast('No reports with grades found for this class', 'warning');
+                return;
+            }
+
+            const btn = document.querySelector(`button[onclick="event.stopPropagation(); downloadClassReports('${className}')"]`);
+            if (btn) btn.disabled = true;
+
+            try {
+                let done = 0;
+                showToast(`Starting: 0 / ${classReports.length} PDFs...`, 'success');
+                for (const report of classReports) {
+                    try {
+                        await downloadReportPdf(report.id, report);
+                        done++;
+                        showToast(`Generated: ${done} / ${classReports.length} PDFs...`, 'success');
+                        await new Promise(r => setTimeout(r, 400));
+                    } catch (err) {
+                        console.warn('Skipped report', report.id, err.message);
+                    }
+                }
+                showToast(`Downloaded ${done} report(s)!`, 'success');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // ========== UI HELPERS ==========
+        function staffOnly() {
+            showToast('This area is restricted to school staff.', 'warning');
+        }
+
+        let searchTimer;
+        function debouncedSearch() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadReports(), 350);
+        }
+
+        function showToast(msg, type = 'success') {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast-slide rounded-lg px-4 py-3 shadow-lg flex items-center gap-2 mb-2';
+            const bg = type === 'error' ? '#fef2f2' : type === 'warning' ? '#fffbeb' : '#ecfdf5';
+            const col = type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : '#059669';
+            t.style.cssText = `background:${bg};border:1px solid ${col}30;color:${col};font-size:13px;`;
+            const icon = type === 'error' ? 'alert-circle' : type === 'warning' ? 'alert-triangle' : 'check-circle';
+            t.innerHTML = `<i data-lucide="${icon}" style="width:16px;height:16px;flex-shrink:0;"></i> <span>${msg}</span>`;
+            c.appendChild(t);
+            lucide.createIcons({ nodes: [t] });
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ========== INIT ==========
+        async function init() {
+            lucide.createIcons();
+            try {
+                const res = await fetch(`${API_BASE}/api/public/settings`);
+                if (res.ok) {
+                    const s = await res.json();
+                    if (s.school_name) {
+                        document.getElementById('school-name-display').textContent = s.school_name;
+                    }
+                    if (s.academic_year) {
+                        document.getElementById('year-badge').textContent = s.academic_year;
+                    }
+                }
+            } catch (e) {
+                console.warn('Settings unavailable:', e);
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/public/logo`);
+                if (res.ok) {
+                    const d = await res.json();
+                    if (d.data_url) {
+                        localStorage.setItem('lidoma_logo_base64', d.data_url);
+                        const img = document.getElementById('school-logo-main');
+                        img.src = d.data_url;
+                        img.style.visibility = 'visible';
+                    }
+                }
+            } catch (e) {
+                console.warn('Logo unavailable:', e);
+            }
+
+            await loadReports();
         }
 
         init();
     </script>
 </body>
+
 </html>

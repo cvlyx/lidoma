@@ -993,16 +993,14 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
 
 
-@app.get("/api/reports", response_model=list[ReportSummary])
-def list_reports(
-    _: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
+def _build_report_summaries(
+    db: Session,
     student_class: str | None = None,
     term: str | None = None,
     academic_year: str | None = None,
     search: str | None = None,
-):
-    """List all reports with live stats via a single aggregated query"""
+) -> list[ReportSummary]:
+    """List all reports with live stats via a single aggregated query (shared by admin + public)."""
     from sqlalchemy import Float, cast
 
     # Subquery: aggregate grade_records per student/term/year
@@ -1129,13 +1127,32 @@ def list_reports(
     return result
 
 
-@app.get("/api/reports/{report_id}", response_model=ReportFull)
-def get_report(
-    report_id: int,
+@app.get("/api/reports", response_model=list[ReportSummary])
+def list_reports(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    student_class: str | None = None,
+    term: str | None = None,
+    academic_year: str | None = None,
+    search: str | None = None,
 ):
-    """Get full report details with fresh grades from grade_records"""
+    return _build_report_summaries(db, student_class, term, academic_year, search)
+
+
+@app.get("/api/public/reports", response_model=list[ReportSummary])
+def public_list_reports(
+    db: Annotated[Session, Depends(get_db)],
+    student_class: str | None = None,
+    term: str | None = None,
+    academic_year: str | None = None,
+    search: str | None = None,
+):
+    """Public read-only archive of all school reports (for the parent portal)."""
+    return _build_report_summaries(db, student_class, term, academic_year, search)
+
+
+def _build_report_full(db: Session, report_id: int) -> ReportFull:
+    """Shared logic: full report details with fresh grades (admin + public)."""
     r = db.scalar(select(SchoolReport).where(SchoolReport.id == report_id))
     if not r:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -1199,6 +1216,25 @@ def get_report(
         report_data=fresh_report_data,
         pdf_data=r.pdf_data,
     )
+
+
+@app.get("/api/reports/{report_id}", response_model=ReportFull)
+def get_report(
+    report_id: int,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Get full report details with fresh grades from grade_records"""
+    return _build_report_full(db, report_id)
+
+
+@app.get("/api/public/reports/{report_id}", response_model=ReportFull)
+def public_get_report(
+    report_id: int,
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Public full report details (for the parent portal report card)."""
+    return _build_report_full(db, report_id)
 
 
 @app.delete("/api/reports/{report_id}", status_code=204)
