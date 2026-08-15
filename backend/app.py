@@ -78,6 +78,10 @@ def calc_grade_backend(score: int, student_class: str) -> dict:
             return {"grade": "C", "points": 1, "result": "PASS"}
         elif score >= 50:
             return {"grade": "D", "points": 1, "result": "PASS"}
+        elif score >= 40:
+            return {"grade": "E", "points": 1, "result": "PASS"}
+        elif score >= 31:
+            return {"grade": "U", "points": 0, "result": "FAIL"}
         else:
             return {"grade": "F", "points": 0, "result": "FAIL"}
     else:
@@ -570,7 +574,7 @@ def parent_report_pdf(
         raise HTTPException(status_code=500, detail="PDF generation library not available")
 
     report = _require_parent_report(report_id, student, db)
-    report_data = json.loads(report.report_data)
+    report_data = _build_report_full(db, report.id).report_data
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     doc.build(_build_report_pdf_elements(report, report_data))
@@ -612,7 +616,7 @@ def parent_download_reports(
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for report in reports:
-            report_data = json.loads(report.report_data)
+            report_data = _build_report_full(db, report.id).report_data
             pdf_buffer = BytesIO()
             doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
             doc.build(_build_report_pdf_elements(report, report_data))
@@ -1909,7 +1913,6 @@ def _build_report_pdf_elements(report: SchoolReport, report_data: dict) -> list:
         spaceAfter=12
     )
     
-    _school_name_row = _db.scalar(select(AppSetting).where(AppSetting.key == "school_name"))
     _school_name = report_data.get('school_name') or (_school_name_row.value if _school_name_row else None) or 'SCHOOL'
     elements.append(Paragraph(f"{_school_name}", title_style))
     elements.append(Paragraph("PROGRESS REPORT CARD", styles['Heading2']))
@@ -2001,7 +2004,7 @@ def download_report_pdf(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    report_data = json.loads(report.report_data)
+    report_data = _build_report_full(db, report.id).report_data
     
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -2039,7 +2042,7 @@ def download_batch_reports(
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for report in reports:
-            report_data = json.loads(report.report_data)
+            report_data = _build_report_full(db, report.id).report_data
             pdf_buffer = BytesIO()
             doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
             elements = _build_report_pdf_elements(report, report_data)
@@ -2090,7 +2093,7 @@ def download_class_reports(
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for report in reports:
-            report_data = json.loads(report.report_data)
+            report_data = _build_report_full(db, report.id).report_data
             pdf_buffer = BytesIO()
             doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
             elements = _build_report_pdf_elements(report, report_data)
