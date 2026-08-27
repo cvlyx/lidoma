@@ -1,10 +1,10 @@
-# 🎓 LIDOMA School Exam Report Analyzer
+# 🎓 Clique for Schools — Exam Report Analyzer
 
 <div align="center">
 
-![LIDOMA Banner](image.png)
+![Clique for Schools](image.png)
 
-**A full-stack academic management system for LIDOMA Private Secondary School**  
+**A full-stack academic management system for LIDOMA Private Secondary School, powered by Clique for Schools**  
 *Manage students, enter grades, generate reports, and empower parents — all in one place.*
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -20,7 +20,7 @@
 
 ## ✨ Overview
 
-LIDOMA is a modern, responsive school exam report management system built for secondary schools. It provides teachers and administrators with a streamlined interface to register students, enter subject scores, generate printable reports, and share results with parents — all backed by a secure REST API.
+Clique for Schools is a modern, responsive school exam report management system built for secondary schools. It provides teachers and administrators with a streamlined interface to register students, enter subject scores, generate printable reports, and share results with parents — all backed by a secure REST API.
 
 ---
 
@@ -212,11 +212,11 @@ Full interactive docs: `http://your-api-url/docs`
 
 ## 📄 License
 
-This project is proprietary software developed for **LIDOMA Private Secondary School**.  
+This project is proprietary software developed for **LIDOMA Private Secondary School** and delivered as **Clique for Schools**.  
 All rights reserved © 2026.
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for LIDOMA Private Secondary School</sub>
+  <sub>Built with ❤️ for LIDOMA Private Secondary School · Clique for Schools</sub>
 </div>
