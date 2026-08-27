@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
-    <title>LIDOMA - Parent Portal</title>
+    <title>Clique for Schools - Parent Portal</title>
     <script>
         (function() {
             const originalWarn = console.warn;
@@ -24,9 +24,78 @@
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap"
         rel="stylesheet">
     <style>
+        /* ============================================================
+           CLIQUE FOR SCHOOLS — design system (overrides)
+           ============================================================ */
+        :root {
+            --clq-bg: #f1f4f9;
+            --clq-card: #ffffff;
+            --clq-border: #d3dae4;
+            --clq-primary: #265e8c;
+            --clq-primary-soft: #e3ebf2;
+            --clq-accent: #e8704f;
+            --clq-accent-soft: #fdece6;
+            --clq-nav: #182d3e;
+            --clq-nav-soft: #eef3f8;
+            --clq-fg: #1d2839;
+            --clq-muted-fg: #637288;
+            --clq-secondary: #e3ebf2;
+            --clq-radius: 0.75rem;
+            --clq-font-sans: 'DM Sans', sans-serif;
+            --clq-font-serif: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+        }
+        body, html {
+            font-family: var(--clq-font-sans);
+            background: var(--clq-bg) !important;
+            color: var(--clq-fg);
+        }
+        #app { background: var(--clq-bg) !important; }
+        .font-display { font-family: var(--clq-font-serif) !important; letter-spacing: -0.02em; }
+        h1, h2, h3, .font-display { font-family: var(--clq-font-serif); }
+
+        /* Header (light Clique bar) */
+        #app-header {
+            background: var(--clq-nav) !important;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        #app-header .font-display { color: #fff !important; }
+        #app-header p { color: rgba(220,231,240,0.6) !important; }
+
+        /* Nav tabs */
+        nav[aria-label="Main navigation"] { background: #ffffff !important; border-bottom: 1px solid var(--clq-border) !important; }
+        nav[aria-label="Main navigation"] .tab-btn { color: var(--clq-muted-fg) !important; }
+        nav[aria-label="Main navigation"] .tab-btn.tab-active {
+            color: var(--clq-primary) !important;
+            border-color: var(--clq-accent) !important;
+        }
+
+        /* Card restyle */
+        section[style*="background:#ffffff"],
+        div[style*="background:#ffffff"] {
+            background: var(--clq-card) !important;
+            border: 1px solid var(--clq-border) !important;
+            border-radius: var(--clq-radius) !important;
+        }
+        button[style*="background:#4f46e5"],
+        button[style*="background:linear-gradient(135deg,#4f46e5"],
+        div[style*="background:linear-gradient(135deg,#4f46e5"],
+        div[style*="background: #4f46e5"],
+        div[style*="background:#4f46e5"] { background: var(--clq-primary) !important; }
+        span[style*="background:#4f46e5"] { background: var(--clq-primary) !important; }
+        span[style*="color:#4f46e5"] { color: var(--clq-primary) !important; }
+        i[style*="color:#818cf8"] { color: var(--clq-accent) !important; }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--clq-primary) !important;
+            box-shadow: 0 0 0 3px rgba(38,94,140,0.12) !important;
+        }
+        table thead tr { background: #f4f7fb !important; }
+        table thead th { color: var(--clq-muted-fg) !important; text-transform: uppercase; font-size: 11px !important; letter-spacing: 0.06em; }
+
+        @media (max-width: 768px) { #app-header { padding: 0.85rem 1rem !important; } }
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
@@ -176,7 +245,7 @@
                         onerror="this.style.visibility='hidden'">
                     <div>
                         <h1 id="school-name-display" class="font-display text-2xl font-bold" style="color:#f8fafc;">
-                            LIDOMA PRIVATE SECONDARY SCHOOL</h1>
+                            Clique for Schools</h1>
                         <p class="text-sm mt-1" style="color:#94a3b8;">Terminal Examination Report</p>
                     </div>
                 </div>
@@ -392,7 +461,7 @@
             <div class="text-center py-8">
                 <p class="text-xs" style="color:#94a3b8;">
                     <i data-lucide="shield-check" style="width:12px;height:12px;display:inline;margin-right:4px;"></i>
-                    LIDOMA PRIVATE SECONDARY SCHOOL &mdash; officially generated electronic reports
+                    LIDOMA PRIVATE SECONDARY SCHOOL &mdash; officially generated reports via Clique for Schools
                 </p>
             </div>
         </main>
@@ -600,7 +669,7 @@
             const isForm1Or2 = d.is_form1_or_2;
             const logoDataUrl = localStorage.getItem('lidoma_logo_base64') || '';
             const subjects = d.subjects || [];
-            const sn = d.school_name || 'LIDOMA PRIVATE SECONDARY SCHOOL';
+            const sn = d.school_name || 'Clique for Schools';
             const ay = report.academic_year;
 
             const autoComment = (res) => {

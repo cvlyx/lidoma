@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
-    <title>LIDOMA - School Exam Report Analyzer</title>
+    <title>Clique for Schools - School Management</title>
     <!-- Note: cdn.tailwindcss.com is used for standalone local development convenience.
          For a formal production environment, Tailwind should be installed via PostCSS/CLI. -->
     <script>
@@ -34,9 +34,196 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:wght@600;700;800&amp;display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap"
         rel="stylesheet">
     <style>
+        /* ============================================================
+           CLIQUE FOR SCHOOLS — design system (overrides)
+           Lake blue primary, coral accent, warm paper background,
+           DM Sans body + Plus Jakarta Sans display.
+           ============================================================ */
+        :root {
+            --clq-bg: #f1f4f9;
+            --clq-card: #ffffff;
+            --clq-border: #d3dae4;
+            --clq-primary: #265e8c;
+            --clq-primary-soft: #e3ebf2;
+            --clq-accent: #e8704f;
+            --clq-accent-soft: #fdece6;
+            --clq-nav: #182d3e;
+            --clq-nav-soft: #eef3f8;
+            --clq-fg: #1d2839;
+            --clq-muted-fg: #637288;
+            --clq-secondary: #e3ebf2;
+            --clq-radius: 0.75rem;
+            --clq-font-sans: 'DM Sans', sans-serif;
+            --clq-font-serif: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+        }
+
+        body, html {
+            font-family: var(--clq-font-sans);
+            background: var(--clq-bg);
+            color: var(--clq-fg);
+        }
+        .font-display {
+            font-family: var(--clq-font-serif) !important;
+            letter-spacing: -0.02em;
+        }
+        h1, h2, h3, .font-display {
+            font-family: var(--clq-font-serif);
+        }
+
+        /* App shell: fixed dark sidebar + scrollable main */
+        #app {
+            display: block;
+            background: var(--clq-bg) !important;
+        }
+
+        /* Sidebar */
+        #clq-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 248px;
+            z-index: 40;
+            background: var(--clq-nav);
+            color: #dce7f0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.25s ease;
+        }
+        #clq-sidebar.closed { transform: translateX(-100%); }
+        #clq-sidebar .clq-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 1.25rem 1.25rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        #clq-sidebar .clq-brand-logo {
+            width: 38px; height: 38px;
+            display: grid; place-items: center;
+            border-radius: 0.6rem;
+            background: var(--clq-accent);
+            color: #fff; font-weight: 800;
+        }
+        #clq-sidebar .clq-brand-name { font-family: var(--clq-font-serif); font-weight: 800; font-size: 17px; letter-spacing: -0.03em; color: #fff; }
+        #clq-sidebar .clq-brand-sub { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(220,231,240,0.55); }
+        #clq-sidebar .clq-nav-label { padding: 1rem 1.25rem 0.4rem; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(220,231,240,0.45); }
+        #clq-sidebar nav { flex: 1; overflow-y: auto; padding: 0.25rem 0.75rem 1rem; }
+        #clq-sidebar .tab-btn {
+            display: flex; align-items: center; gap: 0.6rem;
+            width: 100%; text-align: left;
+            padding: 0.6rem 0.75rem; margin-bottom: 0.25rem;
+            border-radius: 0.65rem;
+            font-size: 13px; font-weight: 700;
+            color: rgba(220,231,240,0.7);
+            background: transparent;
+            border: none; border-left: 2px solid transparent;
+            cursor: pointer;
+            transition: background 0.16s ease, color 0.16s ease;
+            color: #b7c9da !important;
+        }
+        #clq-sidebar .tab-btn:hover { background: rgba(255,255,255,0.06); color: #fff !important; }
+        #clq-sidebar .tab-btn.tab-active {
+            background: var(--clq-accent) !important;
+            color: #fff !important;
+        }
+        #clq-sidebar .tab-btn.tab-active i { color: #fff !important; }
+        #clq-sidebar .tab-active { border-bottom: none !important; border-left: none; }
+        #clq-sidebar .clq-user {
+            padding: 0.85rem 1.25rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            display: flex; align-items: center; gap: 0.6rem;
+        }
+        #clq-sidebar .clq-avatar {
+            width: 34px; height: 34px; border-radius: 999px;
+            background: var(--clq-primary-soft); color: var(--clq-primary);
+            display: grid; place-items: center;
+            font-weight: 800; font-family: var(--clq-font-serif);
+        }
+        #clq-sidebarbackdrop { display: none; position: fixed; inset: 0; background: rgba(24,45,62,0.5); z-index: 39; }
+
+        /* Topbar */
+        #clq-topbar {
+            position: sticky; top: 0; z-index: 30;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; flex-wrap: wrap;
+            padding: 1rem 1.5rem;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--clq-border);
+        }
+        #clq-topbar .clq-page-title { font-family: var(--clq-font-serif); font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--clq-fg); }
+        #clq-topbar .clq-page-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clq-accent); }
+        #clq-hamburger { display: none; }
+
+        /* Content wrapper */
+        #clq-main {
+            margin-left: 248px;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+        }
+        .clq-container { width: 100%; max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+        .clq-page { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+        #app[data-clq] > main { max-width: 1280px; }
+
+        /* Restyle existing cards / panels to Clique look */
+        section[style*="background:#ffffff"],
+        section[style*="background: #ffffff"],
+        section[style*="background:white"],
+        .clq-card {
+            background: var(--clq-card) !important;
+            border: 1px solid var(--clq-border) !important;
+            border-radius: var(--clq-radius) !important;
+            box-shadow: 0 1px 2px rgba(24,45,62,0.04);
+        }
+
+        /* Restyle primary (indigo) buttons to Clique primary */
+        button[style*="background:#4f46e5"],
+        button[style*="background: #4f46e5"],
+        .clq-btn-primary {
+            background: var(--clq-primary) !important;
+            color: #fff !important;
+            border-radius: 0.6rem !important;
+        }
+        button[style*="color:#4f46e5"] { color: var(--clq-primary) !important; }
+        span[style*="color:#4f46e5"] { color: var(--clq-primary) !important; }
+        span[style*="background:#4f46e5"] { background: var(--clq-primary) !important; }
+
+        /* Inputs */
+        input, select, textarea {
+            border-color: var(--clq-border) !important;
+            border-radius: 0.6rem !important;
+            color: var(--clq-fg) !important;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--clq-primary) !important;
+            box-shadow: 0 0 0 3px rgba(38,94,140,0.12) !important;
+        }
+
+        /* Tables */
+        table thead tr { background: #f4f7fb !important; }
+        table thead th { color: var(--clq-muted-fg) !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: 0.06em; }
+
+        /* Badges */
+        .clq-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+        /* Responsive: collapse sidebar under 900px */
+        @media (max-width: 900px) {
+            #clq-sidebar { transform: translateX(-100%); }
+            #clq-sidebar.open { transform: translateX(0); }
+            #clq-sidebarbackdrop.show { display: block; }
+            #clq-main { margin-left: 0; }
+            #clq-hamburger { display: inline-flex; }
+        }
+        @media (max-width: 768px) {
+            #clq-topbar { padding: 0.75rem 1rem; }
+            .clq-page, .clq-container { padding: 1rem; }
+        }
+
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
@@ -281,63 +468,74 @@
 </head>
 
 <body class="h-full">
-    <div id="app" class="h-full w-full overflow-auto" style="background:#f0f2f8;"><!-- Toast Container -->
-        <div id="toast-container" class="fixed top-4 right-4 z-50"></div><!-- Header -->
-        <header id="app-header" class="w-full py-5 px-6"
-            style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);">
-            <div class="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
-                <div class="flex items-center gap-4">
-                    <div class="relative group">
-                        <img id="school-logo-main" src="image.png" alt="Logo" class="w-16 h-16 object-contain rounded-lg" onerror="this.src='https://via.placeholder.com/64?text=Logo'">
-                        <label for="logo-upload" class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-lg text-white text-[10px] font-bold">
-                            <i data-lucide="camera" class="w-4 h-4 mr-1"></i> Change
-                        </label>
-                        <input id="logo-upload" type="file" accept="image/*" class="hidden">
-                    </div>
-                    <div>
-                        <h1 id="school-name-display" class="font-display text-2xl font-bold" style="color:#f8fafc;">
-                            LIDOMA PRIVATE SECONDARY SCHOOL</h1>
-                        <p id="report-title-display" class="text-sm mt-1" style="color:#94a3b8;">Terminal Examination Report
-                        </p>
+    <div id="app" class="h-full w-full" data-clq="1"><!-- Toast Container -->
+        <div id="toast-container" class="fixed top-4 right-4 z-[60]"></div>
+
+        <!-- ===== CLIQUE FOR SCHOOLS : dark sidebar ===== -->
+        <div id="clq-sidebar" role="navigation" aria-label="Main navigation">
+            <div class="clq-brand">
+                <div class="clq-brand-logo" id="clq-brand-logo">C</div>
+                <div>
+                    <div class="clq-brand-name">clique<span style="color:var(--clq-accent);">.</span></div>
+                    <div class="clq-brand-sub">for schools</div>
+                </div>
+            </div>
+            <div class="clq-nav-label">Overview</div>
+            <nav>
+                <button class="tab-btn" data-tab="students" style="color:inherit;"><i data-lucide="users" style="width:17px;height:17px;"></i><span>Manage Students</span></button>
+                <button class="tab-btn tab-active" data-tab="entry" style="border-color:transparent;color:inherit;"><i data-lucide="pencil-line" style="width:17px;height:17px;"></i><span>Enter Grades</span></button>
+                <button class="tab-btn" data-tab="report" style="color:inherit;"><i data-lucide="file-text" style="width:17px;height:17px;"></i><span>View Report</span></button>
+                <button class="tab-btn" data-tab="analytics" style="color:inherit;"><i data-lucide="bar-chart-2" style="width:17px;height:17px;"></i><span>Analytics</span></button>
+                <button class="tab-btn" data-tab="reports-archive" style="color:inherit;"><i data-lucide="folder-archive" style="width:17px;height:17px;"></i><span>Reports Archive</span></button>
+                <button class="tab-btn" data-tab="teacher-access" style="color:inherit;"><i data-lucide="graduation-cap" style="width:17px;height:17px;"></i><span>Teacher Access</span></button>
+                <button class="tab-btn" data-tab="settings" style="color:inherit;"><i data-lucide="settings" style="width:17px;height:17px;"></i><span>Settings</span></button>
+            </nav>
+            <div class="clq-user">
+                <div class="clq-avatar">G</div>
+                <div>
+                    <div style="font-size:12px;font-weight:700;color:#fff;">Administrator</div>
+                    <div style="font-size:10px;color:rgba(220,231,240,0.55);">clique for schools</div>
+                </div>
+            </div>
+        </div>
+        <div id="clq-sidebarbackdrop"></div>
+
+        <!-- ===== Main column ===== -->
+        <div id="clq-main">
+            <!-- Topbar -->
+            <header id="clq-topbar" class="no-print">
+                <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;">
+                    <button id="clq-hamburger" onclick="document.getElementById('clq-sidebar').classList.toggle('open');document.getElementById('clq-sidebarbackdrop').classList.toggle('show');" style="background:var(--clq-nav);color:#fff;border:none;border-radius:0.6rem;width:40px;height:40px;place-items:center;">
+                        <i data-lucide="menu" style="width:18px;height:18px;"></i>
+                    </button>
+                    <div style="min-width:0;">
+                        <div class="clq-page-eyebrow">School workspace</div>
+                        <div class="clq-page-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Good morning, Admin</div>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
+                <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <div class="relative">
+                            <img id="school-logo-main" src="image.png" alt="Logo" class="w-9 h-9 object-contain rounded" onerror="this.style.display='none';">
+                            <label for="logo-upload" class="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded text-[8px] font-bold text-white" title="Change logo">
+                                <i data-lucide="camera" style="width:12px;height:12px;"></i>
+                            </label>
+                            <input id="logo-upload" type="file" accept="image/*" class="hidden">
+                        </div>
+                        <div>
+                            <h1 id="school-name-display" class="font-display text-base font-extrabold leading-tight" style="color:var(--clq-fg);">Clique for Schools</h1>
+                            <p id="report-title-display" class="text-xs" style="color:var(--clq-muted-fg);">Terminal Examination Report</p>
+                        </div>
+                    </div>
+                    <span id="year-badge" class="clq-badge" style="background:var(--clq-primary-soft);color:var(--clq-primary);">2024/2025</span>
                     <a href="/parent" target="_blank"
-                        class="px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                        style="background:rgba(255,255,255,0.1);color:#f8fafc;border:1px solid rgba(255,255,255,0.2);">
-                        <i data-lucide="external-link" style="width:14px;height:14px;color:#818cf8;"></i> Parent Portal
+                        class="clq-btn" style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--clq-primary);color:#fff;padding:0.5rem 0.85rem;border-radius:0.6rem;font-size:12px;font-weight:700;text-decoration:none;">
+                        <i data-lucide="external-link" style="width:14px;height:14px;"></i> Parent Portal
                     </a>
-                    <div class="flex items-center gap-2"><span id="year-badge"
-                            class="px-3 py-1 rounded-full text-xs font-semibold"
-                            style="background:#4f46e5;color:#f8fafc;">2024/2025</span>
-                    </div>
                 </div>
-            </div>
-        </header><!-- Tabs -->
-        <nav class="w-full px-6 no-print" style="background:#ffffff;border-bottom:1px solid #e2e8f0;" role="navigation"
-            aria-label="Main navigation">
-            <div class="max-w-6xl mx-auto flex gap-6">
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="students" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="users" style="width:15px;height:15px;"></i>
-                        Manage Students</span> </button>
-                <button class="tab-btn tab-active py-3 px-1 text-sm transition-colors" data-tab="entry"
-                    style="border-color:#4f46e5;color:#4f46e5;"> <span class="flex items-center gap-1.5"><i data-lucide="pencil" style="width:15px;height:15px;"></i> Enter Grades</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="report" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="file-text"
-                            style="width:15px;height:15px;"></i> View Report</span> </button> <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="analytics" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="bar-chart-2"
-                            style="width:15px;height:15px;"></i> Analytics</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="reports-archive" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="folder-archive"
-                            style="width:15px;height:15px;"></i> Reports Archive</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="teacher-access" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="graduation-cap"
-                            style="width:15px;height:15px;"></i> Teacher Access</span> </button>
-                <button class="tab-btn py-3 px-1 text-sm transition-colors" data-tab="settings" style="color:#64748b;">
-                    <span class="flex items-center gap-1.5"><i data-lucide="settings"
-                            style="width:15px;height:15px;"></i> Settings</span> </button>
-            </div>
-        </nav>
+            </header>
+
+            <!-- Tab sections -->
 
         <!-- Tab: Students -->
         <main id="tab-students" class="max-w-6xl mx-auto p-6 hidden fade-in">
@@ -1209,6 +1407,7 @@
                 </div>
             </div>
         </div>
+        </div><!-- /clq-main -->
     </div>
     <script>
         // ========== GRADING LOGIC ==========
@@ -1691,7 +1890,7 @@
         };
 
         const defaultConfig = {
-            school_name: 'LIDOMA PRIVATE SECONDARY SCHOOL',
+            school_name: 'Clique for Schools',
             report_title: 'Terminal Examination Report',
             academic_year: '2024/2025',
             background_color: '#f0f2f8',
@@ -2416,7 +2615,7 @@
             const isForm1Or2 = d.is_form1_or_2;
             const logoDataUrl = localStorage.getItem('lidoma_logo_base64') || '';
             const subjects = d.subjects || [];
-            const sn = d.school_name || 'LIDOMA PRIVATE SECONDARY SCHOOL';
+            const sn = d.school_name || 'Clique for Schools';
             const ay = report.academic_year;
 
             const autoComment = (res) => {
@@ -3630,7 +3829,7 @@
                             <p class="text-sm font-black text-slate-900 uppercase">${{ 'First Term':'20th APRIL, 2026', 'Second Term':'14th SEPTEMBER, 2026', 'Third Term':'14th SEPTEMBER, 2026' }[report.term] || '20th APRIL, 2026'}</p>
                         </div>
                         <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 italic">This is an electronically generated official report card of LIDOMA PRIVATE SECONDARY SCHOOL.</p>
+                            <p class="text-[9px] font-bold text-slate-400 italic">This is an electronically generated official report card of Clique for Schools.</p>
                         </div>
                     </div>
                 </div>
